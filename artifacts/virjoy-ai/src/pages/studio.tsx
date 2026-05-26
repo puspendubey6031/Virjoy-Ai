@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,8 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Sparkles, Wand2, CheckCircle2,
   Target, Ghost, MonitorPlay, Smartphone, Clapperboard, Video,
-  ArrowRight, Download, PlayCircle, Activity,
-  Paperclip, X, ImageIcon, Film
+  Download, Activity, X, ImageIcon, Film, Monitor, ScanLine, Cpu, Zap
 } from "lucide-react";
 
 const formSchema = z.object({
@@ -48,10 +47,25 @@ function detectStyle(prompt: string): { label: string; color: string } {
 }
 
 const EXAMPLE_PROMPTS = [
-  "Create a cinematic promo video for my mobile app with smooth transitions",
-  "Make a dark horror trailer with eerie music and dramatic cuts",
-  "Create a YouTube ad for a modern SaaS product with clean visuals",
-  "Make a lifestyle vlog intro with energetic pacing and vibrant colors",
+  { label: "Cinematic app promo", text: "Create a cinematic promo video for my mobile app with smooth transitions and modern effects" },
+  { label: "Horror trailer", text: "Generate a dark horror trailer with eerie atmosphere, dramatic cuts and spine-chilling audio" },
+  { label: "YouTube Shorts ad", text: "Create a punchy YouTube Shorts ad for a SaaS product with bold text and fast pacing" },
+  { label: "Vlog intro", text: "Make an energetic vlog intro with vibrant colors, travel footage and upbeat music" },
+];
+
+const RATIOS = [
+  { id: "16:9", label: "YouTube", sub: "16:9", icon: Monitor },
+  { id: "9:16-shorts", label: "Shorts", sub: "9:16", icon: Smartphone },
+  { id: "9:16-reel", label: "Reel", sub: "9:16", icon: Smartphone },
+  { id: "1:1", label: "Facebook", sub: "1:1", icon: MonitorPlay },
+  { id: "9:16-tiktok", label: "TikTok", sub: "9:16", icon: Clapperboard },
+];
+
+const GENERATION_STEPS = [
+  { icon: ScanLine, label: "Analyzing prompt", color: "text-violet-400" },
+  { icon: Zap, label: "Building scenes", color: "text-amber-400" },
+  { icon: Cpu, label: "Syncing audio", color: "text-cyan-400" },
+  { icon: Film, label: "Rendering cinematic video", color: "text-emerald-400" },
 ];
 
 export default function Studio() {
@@ -62,11 +76,14 @@ export default function Studio() {
 
   const [images, setImages] = useState<File[]>([]);
   const [clips, setClips] = useState<File[]>([]);
+  const [screenshots, setScreenshots] = useState<File[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const clipInputRef = useRef<HTMLInputElement>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
 
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [showPlanSelector, setShowPlanSelector] = useState(false);
+  const [selectedRatio, setSelectedRatio] = useState("16:9");
+  const [genStep, setGenStep] = useState(0);
 
   const { data: activeJob } = useGetVideo(activeJobId || "", {
     query: {
@@ -89,7 +106,20 @@ export default function Studio() {
   const selectedPlan = plans?.find(p => p.id === selectedPlanId);
   const watchedPrompt = form.watch("prompt");
   const detectedStyle = watchedPrompt.length > 2 ? detectStyle(watchedPrompt) : null;
-  const totalAttachments = images.length + clips.length;
+  const totalAttachments = images.length + clips.length + screenshots.length;
+
+  const isGenerating = createVideoJob.isPending || activeJob?.status === "queued" || activeJob?.status === "processing";
+  const isDone = activeJob?.status === "done";
+  const isFailed = activeJob?.status === "failed";
+
+  // Cycle generation steps while rendering
+  useEffect(() => {
+    if (!isGenerating) { setGenStep(0); return; }
+    const interval = setInterval(() => {
+      setGenStep(s => (s + 1) % GENERATION_STEPS.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [isGenerating]);
 
   const handleEnhanceWithAi = async () => {
     const prompt = form.getValues("prompt");
@@ -112,10 +142,11 @@ export default function Studio() {
     formData.append("plan", values.plan);
     images.forEach(img => formData.append("images", img));
     clips.forEach(clip => formData.append("clips", clip));
+    screenshots.forEach(s => formData.append("images", s));
     try {
       const job = await createVideoJob.mutateAsync({ data: formData as any });
       setActiveJobId(job.id);
-      toast({ title: "Generating Video", description: "Your video is being created from your prompt." });
+      toast({ title: "Generating Video", description: "Your cinematic video is being created." });
     } catch (err: any) {
       toast({ title: "Submission Failed", description: err?.message || "Could not create video job", variant: "destructive" });
     }
@@ -123,53 +154,56 @@ export default function Studio() {
 
   const handleImageFiles = (files: FileList | null) => {
     if (!files) return;
-    const maxImages = selectedPlan?.maxImages || 1;
-    const newFiles = Array.from(files).slice(0, maxImages - images.length);
-    setImages(prev => [...prev, ...newFiles].slice(0, maxImages));
+    const max = selectedPlan?.maxImages || 1;
+    setImages(prev => [...prev, ...Array.from(files)].slice(0, max));
   };
-
   const handleClipFiles = (files: FileList | null) => {
     if (!files) return;
-    const maxClips = selectedPlan?.maxClips || 1;
-    const newFiles = Array.from(files).slice(0, maxClips - clips.length);
-    setClips(prev => [...prev, ...newFiles].slice(0, maxClips));
+    const max = selectedPlan?.maxClips || 1;
+    setClips(prev => [...prev, ...Array.from(files)].slice(0, max));
   };
-
-  const isGenerating = createVideoJob.isPending || activeJob?.status === "queued" || activeJob?.status === "processing";
-  const isDone = activeJob?.status === "done";
-  const isFailed = activeJob?.status === "failed";
+  const handleScreenshotFiles = (files: FileList | null) => {
+    if (!files) return;
+    const max = selectedPlan?.maxImages || 1;
+    setScreenshots(prev => [...prev, ...Array.from(files)].slice(0, max));
+  };
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
     <div className="w-full">
 
-      {/* ── HERO ─────────────────────────────────────────────── */}
+      {/* ── HERO ────────────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col items-center justify-center pt-28 pb-16 px-4 overflow-hidden">
-        {/* bg orbs */}
+        {/* Ambient orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
-            animate={{ scale: [1, 1.3, 1], opacity: [0.25, 0.45, 0.25], x: [0, 80, 0], y: [0, -40, 0] }}
-            transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/3 -left-1/4 w-[700px] h-[700px] bg-primary/25 rounded-full blur-[130px]"
+            animate={{ scale: [1, 1.35, 1], opacity: [0.2, 0.42, 0.2], x: [0, 90, 0], y: [0, -50, 0] }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/3 -left-1/4 w-[750px] h-[750px] bg-primary/30 rounded-full blur-[140px]"
           />
           <motion.div
-            animate={{ scale: [1, 1.5, 1], opacity: [0.15, 0.35, 0.15], x: [0, -80, 0], y: [0, 80, 0] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 3 }}
-            className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-cyan-500/20 rounded-full blur-[110px]"
+            animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.28, 0.1], x: [0, -70, 0], y: [0, 90, 0] }}
+            transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+            className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-cyan-500/25 rounded-full blur-[120px]"
+          />
+          <motion.div
+            animate={{ opacity: [0.05, 0.18, 0.05] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-2/3 left-1/2 -translate-x-1/2 w-[400px] h-[200px] bg-violet-500/30 rounded-full blur-[80px]"
           />
         </div>
 
-        <div className="relative z-10 w-full max-w-4xl mx-auto text-center">
-          {/* badge */}
+        <div className="relative z-10 w-full max-w-3xl mx-auto text-center">
+          {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/25 text-primary text-sm font-semibold mb-8 shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)]"
           >
             <Sparkles className="w-4 h-4" />
             AI-Powered Video Generation
@@ -178,35 +212,48 @@ export default function Studio() {
           <motion.h1
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-black tracking-tighter mb-5 bg-gradient-to-br from-white via-white/95 to-white/50 bg-clip-text text-transparent leading-[1.08]"
+            transition={{ duration: 0.75, delay: 0.1 }}
+            className="text-5xl md:text-7xl font-black tracking-tighter mb-5 leading-[1.06]"
           >
-            Describe Your Video.<br className="hidden md:block" /> We'll Create It.
+            <span className="bg-gradient-to-br from-white via-white/95 to-white/40 bg-clip-text text-transparent">
+              Describe Your Video.
+            </span>
+            <br className="hidden md:block" />
+            <span className="bg-gradient-to-r from-primary via-violet-300 to-cyan-400 bg-clip-text text-transparent">
+              We'll Create It.
+            </span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
-            className="text-lg md:text-xl text-white/50 max-w-xl mx-auto mb-12 font-medium"
+            className="text-lg md:text-xl text-white/45 max-w-lg mx-auto mb-10 font-medium leading-relaxed"
           >
-            Type a prompt. Optionally attach screenshots or clips. VirJoy AI handles the rest.
+            Type a prompt. Optionally attach screenshots or clips.<br className="hidden sm:block" />
+            VirJoy AI handles the rest.
           </motion.p>
 
-          {/* ── MAIN CREATION INTERFACE ── */}
+          {/* ── MAIN CREATION INTERFACE ─────────────────────────────── */}
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.3 }}
+            transition={{ duration: 0.75, delay: 0.3 }}
             id="create"
             className="w-full"
           >
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)}>
-                {/* PROMPT BOX */}
+
+                {/* ── PROMPT BOX ── */}
                 <div className="relative group mb-3">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/40 via-cyan-500/20 to-primary/40 rounded-2xl blur-sm opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
-                  <div className="relative bg-white/[0.04] border border-white/10 group-focus-within:border-primary/30 rounded-2xl transition-colors duration-300 overflow-hidden backdrop-blur-xl">
+                  {/* animated gradient glow ring */}
+                  <motion.div
+                    animate={{ opacity: [0.4, 0.8, 0.4] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -inset-[1px] bg-gradient-to-r from-primary/60 via-cyan-500/30 to-violet-500/60 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"
+                  />
+                  <div className="relative bg-[#0d0d14] border border-white/[0.08] group-focus-within:border-primary/40 rounded-2xl transition-all duration-500 overflow-hidden shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_20px_60px_-20px_rgba(0,0,0,0.8)] group-focus-within:shadow-[0_0_0_1px_rgba(139,92,246,0.15),0_20px_80px_-20px_rgba(139,92,246,0.25)]">
                     <FormField
                       control={form.control}
                       name="prompt"
@@ -215,67 +262,56 @@ export default function Studio() {
                           <FormControl>
                             <Textarea
                               placeholder="Describe the video you want to create..."
-                              rows={4}
-                              className="w-full bg-transparent border-0 text-white text-base md:text-lg placeholder:text-white/25 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 px-6 pt-5 pb-3 leading-relaxed"
+                              rows={6}
+                              className="w-full bg-transparent border-0 text-white text-lg md:text-xl placeholder:text-white/20 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 px-6 pt-6 pb-4 leading-relaxed font-medium tracking-[-0.01em]"
                               disabled={isGenerating}
                               {...field}
                             />
                           </FormControl>
-                          <FormMessage className="px-6 pb-2 text-left text-rose-400" />
+                          <FormMessage className="px-6 pb-2 text-left text-rose-400 text-sm" />
                         </FormItem>
                       )}
                     />
 
-                    {/* bottom toolbar inside the prompt box */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-white/[0.06]">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* attach images */}
-                        <input
-                          ref={imageInputRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={e => handleImageFiles(e.target.files)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => imageInputRef.current?.click()}
-                          disabled={isGenerating || images.length >= (selectedPlan?.maxImages || 1)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white/80 hover:bg-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <ImageIcon className="w-4 h-4" />
-                          <span>Images {images.length > 0 && <span className="text-primary font-semibold">({images.length})</span>}</span>
-                        </button>
+                    {/* Toolbar inside prompt box */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-white/[0.05] bg-white/[0.015]">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {/* hidden file inputs */}
+                        <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleImageFiles(e.target.files)} />
+                        <input ref={clipInputRef} type="file" accept="video/*" multiple className="hidden" onChange={e => handleClipFiles(e.target.files)} />
+                        <input ref={screenshotInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleScreenshotFiles(e.target.files)} />
 
-                        {/* attach clips */}
-                        <input
-                          ref={clipInputRef}
-                          type="file"
-                          accept="video/*"
-                          multiple
-                          className="hidden"
-                          onChange={e => handleClipFiles(e.target.files)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => clipInputRef.current?.click()}
-                          disabled={isGenerating || clips.length >= (selectedPlan?.maxClips || 1)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white/80 hover:bg-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Film className="w-4 h-4" />
-                          <span>Clips {clips.length > 0 && <span className="text-primary font-semibold">({clips.length})</span>}</span>
-                        </button>
+                        {/* Attach buttons */}
+                        {[
+                          { label: "Images", icon: ImageIcon, count: images.length, max: selectedPlan?.maxImages || 1, onClick: () => imageInputRef.current?.click(), color: "text-blue-400" },
+                          { label: "Clips", icon: Film, count: clips.length, max: selectedPlan?.maxClips || 1, onClick: () => clipInputRef.current?.click(), color: "text-emerald-400" },
+                          { label: "Screenshots", icon: Monitor, count: screenshots.length, max: selectedPlan?.maxImages || 1, onClick: () => screenshotInputRef.current?.click(), color: "text-violet-400" },
+                        ].map(btn => (
+                          <button
+                            key={btn.label}
+                            type="button"
+                            onClick={btn.onClick}
+                            disabled={isGenerating || btn.count >= btn.max}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/45 hover:text-white/80 hover:bg-white/8 transition-all disabled:opacity-35 disabled:cursor-not-allowed group/btn"
+                          >
+                            <span className="text-white/30 group-hover/btn:text-white/60 transition-colors font-bold text-base leading-none">+</span>
+                            <btn.icon className={`w-3.5 h-3.5 ${btn.color}`} />
+                            <span>{btn.label}</span>
+                            {btn.count > 0 && (
+                              <span className="text-primary font-bold">({btn.count})</span>
+                            )}
+                          </button>
+                        ))}
 
-                        {/* detected style badge */}
+                        {/* detected style pill */}
                         <AnimatePresence>
                           {detectedStyle && (
                             <motion.span
                               key="style"
-                              initial={{ opacity: 0, scale: 0.9 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.9 }}
-                              className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${detectedStyle.color}`}
+                              initial={{ opacity: 0, scale: 0.85, x: -4 }}
+                              animate={{ opacity: 1, scale: 1, x: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ml-1 ${detectedStyle.color}`}
                             >
                               <Sparkles className="w-3 h-3" />
                               {detectedStyle.label}
@@ -285,7 +321,6 @@ export default function Studio() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {/* AI enhance — premium only */}
                         {selectedPlan?.aiStory && (
                           <Button
                             type="button"
@@ -293,7 +328,7 @@ export default function Studio() {
                             variant="ghost"
                             onClick={handleEnhanceWithAi}
                             disabled={generateAiStory.isPending || !watchedPrompt.trim() || isGenerating}
-                            className="text-primary/80 hover:text-primary hover:bg-primary/10 text-xs font-semibold rounded-lg h-8 px-3 gap-1.5"
+                            className="text-primary/70 hover:text-primary hover:bg-primary/10 text-xs font-semibold rounded-lg h-8 px-3 gap-1.5"
                           >
                             {generateAiStory.isPending
                               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enhancing...</>
@@ -306,39 +341,66 @@ export default function Studio() {
                   </div>
                 </div>
 
-                {/* attachments preview strip */}
+                {/* ── ATTACHMENT CHIPS ── */}
                 <AnimatePresence>
                   {totalAttachments > 0 && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex flex-wrap gap-2 mb-3 px-1"
+                      initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      animate={{ opacity: 1, height: "auto", marginBottom: 12 }}
+                      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      className="flex flex-wrap gap-2 px-1"
                     >
                       {images.map((file, i) => (
-                        <div key={`img-${i}`} className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white/60">
-                          <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
-                          <span className="max-w-[100px] truncate">{file.name}</span>
-                          <button type="button" onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))} className="text-white/30 hover:text-white/70 ml-0.5">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <motion.div key={`img-${i}`} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5 text-xs text-blue-300">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span className="max-w-[110px] truncate">{file.name}</span>
+                          <button type="button" onClick={() => setImages(p => p.filter((_, idx) => idx !== i))} className="text-blue-400/50 hover:text-blue-300 ml-0.5"><X className="w-3 h-3" /></button>
+                        </motion.div>
                       ))}
                       {clips.map((file, i) => (
-                        <div key={`clip-${i}`} className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white/60">
-                          <Film className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="max-w-[100px] truncate">{file.name}</span>
-                          <button type="button" onClick={() => setClips(prev => prev.filter((_, idx) => idx !== i))} className="text-white/30 hover:text-white/70 ml-0.5">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <motion.div key={`clip-${i}`} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300">
+                          <Film className="w-3.5 h-3.5" />
+                          <span className="max-w-[110px] truncate">{file.name}</span>
+                          <button type="button" onClick={() => setClips(p => p.filter((_, idx) => idx !== i))} className="text-emerald-400/50 hover:text-emerald-300 ml-0.5"><X className="w-3 h-3" /></button>
+                        </motion.div>
+                      ))}
+                      {screenshots.map((file, i) => (
+                        <motion.div key={`ss-${i}`} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-lg px-2.5 py-1.5 text-xs text-violet-300">
+                          <Monitor className="w-3.5 h-3.5" />
+                          <span className="max-w-[110px] truncate">{file.name}</span>
+                          <button type="button" onClick={() => setScreenshots(p => p.filter((_, idx) => idx !== i))} className="text-violet-400/50 hover:text-violet-300 ml-0.5"><X className="w-3 h-3" /></button>
+                        </motion.div>
                       ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* options row: duration + plan + style override */}
-                <div className="flex flex-wrap items-center gap-2 mb-4 px-1">
+                {/* ── PLATFORM RATIO SELECTOR ── */}
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-xs text-white/30 font-medium">Platform:</span>
+                  {RATIOS.map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setSelectedRatio(r.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                        selectedRatio === r.id
+                          ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_12px_-4px_rgba(139,92,246,0.6)]"
+                          : "bg-white/[0.04] border-white/10 text-white/40 hover:text-white/70 hover:bg-white/8 hover:border-white/20"
+                      }`}
+                    >
+                      <r.icon className="w-3 h-3" />
+                      {r.label}
+                      <span className="text-[10px] opacity-60">{r.sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── OPTIONS ROW: duration + plan + style ── */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
                   <FormField
                     control={form.control}
                     name="duration"
@@ -346,7 +408,7 @@ export default function Studio() {
                       <FormItem className="flex-shrink-0">
                         <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value.toString()}>
                           <FormControl>
-                            <SelectTrigger className="h-9 bg-white/5 border-white/10 rounded-xl text-sm text-white/70 hover:bg-white/10 w-36">
+                            <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/60 hover:bg-white/8 hover:text-white/80 w-36 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -369,19 +431,17 @@ export default function Studio() {
                         <Select onValueChange={(v) => {
                           field.onChange(v);
                           const plan = plans?.find(p => p.id === v);
-                          if (plan && form.getValues("duration") > plan.maxDuration) {
-                            form.setValue("duration", plan.maxDuration);
-                          }
+                          if (plan && form.getValues("duration") > plan.maxDuration) form.setValue("duration", plan.maxDuration);
                         }} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-9 bg-white/5 border-white/10 rounded-xl text-sm text-white/70 hover:bg-white/10 w-40">
+                            <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/60 hover:bg-white/8 hover:text-white/80 w-40 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {plans?.map(p => (
                               <SelectItem key={p.id} value={p.id}>
-                                {p.name} {p.price > 0 ? `(₹${p.price}/mo)` : "(Free)"}
+                                {p.name} {p.price > 0 ? `· ₹${p.price}/mo` : "· Free"}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -397,7 +457,7 @@ export default function Studio() {
                       <FormItem className="flex-shrink-0">
                         <Select onValueChange={field.onChange} value={field.value ?? ""}>
                           <FormControl>
-                            <SelectTrigger className="h-9 bg-white/5 border-white/10 rounded-xl text-sm text-white/50 hover:bg-white/10 w-44">
+                            <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/50 hover:bg-white/8 hover:text-white/70 w-44 transition-colors">
                               <SelectValue placeholder="Auto-detect style" />
                             </SelectTrigger>
                           </FormControl>
@@ -411,218 +471,257 @@ export default function Studio() {
                       </FormItem>
                     )}
                   />
-
-                  <span className="text-xs text-white/25 hidden sm:block">Style auto-detected if not set</span>
                 </div>
 
-                {/* generate button */}
+                {/* ── GENERATE BUTTON ── */}
                 {!activeJobId && (
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="w-full h-14 rounded-xl text-lg font-black bg-white text-black hover:bg-white/90 shadow-[0_0_50px_-12px_rgba(255,255,255,0.5)] transition-all duration-300 hover:scale-[1.015] hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.6)]"
-                    disabled={isGenerating}
-                  >
-                    {isGenerating
-                      ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Generating...</>
-                      : <><Sparkles className="w-5 h-5 mr-2" /> Generate Video</>
-                    }
-                  </Button>
+                  <div className="relative group/btn">
+                    <motion.div
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="absolute -inset-[2px] bg-gradient-to-r from-primary via-violet-400 to-cyan-500 rounded-2xl blur-md group-hover/btn:blur-lg transition-all duration-300"
+                    />
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="relative w-full h-14 rounded-xl text-lg font-black bg-gradient-to-r from-primary via-violet-500 to-cyan-500 hover:from-primary/90 hover:via-violet-500/90 hover:to-cyan-500/90 text-white border-0 shadow-none transition-all duration-300 hover:scale-[1.015]"
+                      disabled={isGenerating}
+                    >
+                      {isGenerating
+                        ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Generating…</>
+                        : <><Sparkles className="w-5 h-5 mr-2" /> Generate Cinematic Video</>
+                      }
+                    </Button>
+                  </div>
                 )}
               </form>
             </Form>
 
-            {/* example prompts */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-xs text-white/25">Try:</span>
+            {/* ── EXAMPLE PROMPTS ── */}
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <span className="text-xs text-white/20 font-medium">Try:</span>
               {EXAMPLE_PROMPTS.map((p, i) => (
-                <button
+                <motion.button
                   key={i}
                   type="button"
-                  onClick={() => form.setValue("prompt", p)}
-                  className="text-xs text-white/35 hover:text-white/60 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-full px-3 py-1 transition-all truncate max-w-[240px]"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => form.setValue("prompt", p.text)}
+                  className="text-xs text-white/40 hover:text-white/75 bg-white/[0.03] hover:bg-primary/10 border border-white/[0.07] hover:border-primary/30 rounded-full px-3.5 py-1.5 transition-all duration-200 font-medium"
                 >
-                  {p}
-                </button>
+                  {p.label}
+                </motion.button>
               ))}
             </div>
           </motion.div>
 
-          {/* job status panel (shown after submission) */}
+          {/* ── JOB STATUS PANEL ── */}
           <AnimatePresence>
             {activeJobId && (
               <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="mt-6 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl text-left"
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                className="mt-6 rounded-2xl overflow-hidden border border-white/10 backdrop-blur-xl text-left shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)]"
               >
-                <div className="flex items-center gap-2 mb-4 font-semibold text-base">
-                  <Activity className="w-4 h-4 text-primary" />
-                  Generation Status
-                </div>
-
-                {isGenerating && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-white/60 capitalize">{activeJob?.status || "Initializing"}…</span>
-                      <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                    </div>
-                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-primary to-cyan-400 rounded-full"
-                        initial={{ width: "5%" }}
-                        animate={{ width: activeJob?.status === "processing" ? "65%" : "30%" }}
-                        transition={{ duration: 2.5, ease: "easeInOut", repeat: Infinity, repeatType: "reverse" }}
-                      />
-                    </div>
-                    <p className="text-xs text-white/35 text-center">Applying cinematic effects and rendering your video…</p>
+                <div className="bg-[#0d0d14] p-6">
+                  <div className="flex items-center gap-2 mb-5 font-semibold text-sm text-white/60 uppercase tracking-widest">
+                    <Activity className="w-3.5 h-3.5 text-primary" />
+                    Generation Status
                   </div>
-                )}
 
-                {isDone && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 p-3 rounded-xl border border-emerald-400/20 text-sm font-semibold">
-                      <CheckCircle2 className="w-5 h-5 shrink-0" /> Your video is ready!
-                    </div>
-                    {activeJob?.outputUrl && (
-                      <div className="rounded-xl overflow-hidden border border-white/10 bg-black">
-                        <VideoPlayer url={activeJob.outputUrl} title={activeJob.title || "Generated Video"} />
+                  {/* ── CINEMATIC GENERATION STEPS ── */}
+                  {isGenerating && (
+                    <div className="space-y-5">
+                      {/* Step indicators */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {GENERATION_STEPS.map((step, i) => {
+                          const isActive = i === genStep;
+                          const isDoneStep = i < genStep;
+                          return (
+                            <motion.div
+                              key={i}
+                              animate={isActive ? { scale: [1, 1.02, 1] } : {}}
+                              transition={{ duration: 1.2, repeat: Infinity }}
+                              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-500 ${
+                                isActive
+                                  ? "bg-primary/10 border-primary/30 shadow-[0_0_20px_-8px_rgba(139,92,246,0.5)]"
+                                  : isDoneStep
+                                  ? "bg-emerald-500/5 border-emerald-500/20"
+                                  : "bg-white/[0.02] border-white/[0.06]"
+                              }`}
+                            >
+                              {isDoneStep
+                                ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                : isActive
+                                ? <step.icon className={`w-5 h-5 ${step.color} animate-pulse`} />
+                                : <step.icon className="w-5 h-5 text-white/20" />
+                              }
+                              <span className={`text-[10px] font-semibold text-center leading-tight ${
+                                isActive ? "text-white/80" : isDoneStep ? "text-emerald-400/70" : "text-white/20"
+                              }`}>
+                                {step.label}
+                              </span>
+                            </motion.div>
+                          );
+                        })}
                       </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      className="w-full h-11 rounded-xl border-white/15 hover:bg-white/10 font-semibold text-sm"
-                      onClick={() => { setActiveJobId(null); form.reset(); setImages([]); setClips([]); }}
-                    >
-                      Create Another Video
-                    </Button>
-                  </div>
-                )}
 
-                {isFailed && (
-                  <div className="space-y-4">
-                    <div className="text-rose-400 bg-rose-400/10 p-3 rounded-xl border border-rose-400/20 text-sm font-medium">
-                      Generation failed. Please try again.
+                      {/* Progress bar */}
+                      <div className="relative h-1 w-full bg-white/[0.06] rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-primary via-violet-400 to-cyan-400"
+                          animate={{ width: ["5%", "85%", "5%"] }}
+                          transition={{ duration: 4.4, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                      </div>
+
+                      {/* Active step label */}
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={genStep}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="text-sm text-center text-white/40"
+                        >
+                          {GENERATION_STEPS[genStep].label}…
+                        </motion.p>
+                      </AnimatePresence>
                     </div>
-                    <Button variant="outline" className="w-full h-11 rounded-xl border-white/15 hover:bg-white/10 font-semibold text-sm" onClick={() => setActiveJobId(null)}>
-                      Reset
-                    </Button>
-                  </div>
-                )}
+                  )}
+
+                  {isDone && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/8 p-3.5 rounded-xl border border-emerald-400/20 text-sm font-semibold">
+                        <CheckCircle2 className="w-5 h-5 shrink-0" /> Your cinematic video is ready!
+                      </div>
+                      {activeJob?.outputUrl && (
+                        <div className="rounded-xl overflow-hidden border border-white/10 bg-black">
+                          <VideoPlayer url={activeJob.outputUrl} title={activeJob.title || "Generated Video"} />
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        className="w-full h-11 rounded-xl border-white/15 hover:bg-white/8 font-semibold text-sm"
+                        onClick={() => { setActiveJobId(null); form.reset(); setImages([]); setClips([]); setScreenshots([]); }}
+                      >
+                        Create Another Video
+                      </Button>
+                    </div>
+                  )}
+
+                  {isFailed && (
+                    <div className="space-y-4">
+                      <div className="text-rose-400 bg-rose-400/8 p-3.5 rounded-xl border border-rose-400/20 text-sm font-medium">
+                        Generation failed. Please try again.
+                      </div>
+                      <Button variant="outline" className="w-full h-11 rounded-xl border-white/15 hover:bg-white/8 font-semibold text-sm" onClick={() => setActiveJobId(null)}>
+                        Reset
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* stat strip */}
-        <div className="w-full mt-12 relative z-10">
+        <div className="w-full mt-14 relative z-10">
           <StatStrip />
         </div>
       </section>
 
-      {/* ── CAPABILITIES (3 clean highlights — no upload tool cards) ── */}
-      <section className="py-20 relative border-t border-white/5">
+      {/* ── CAPABILITIES STRIP ────────────────────────────────────── */}
+      <section className="py-20 relative border-t border-white/[0.05]">
         <div className="container mx-auto px-4 max-w-5xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/5 rounded-3xl overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/[0.04] rounded-3xl overflow-hidden">
             {[
-              {
-                icon: Sparkles,
-                title: "Prompt → Video",
-                desc: "Describe any video in plain language. The AI detects style, pacing, and effects automatically.",
-                color: "text-primary"
-              },
-              {
-                icon: Paperclip,
-                title: "Attach Your Media",
-                desc: "Optionally add screenshots, images, or short clips. They're woven into your video as cinematic scenes.",
-                color: "text-cyan-400"
-              },
-              {
-                icon: Film,
-                title: "Cinematic Output",
-                desc: "Every video gets professional transitions, color grading, and effects — rendered and ready to share.",
-                color: "text-violet-400"
-              },
+              { icon: Sparkles, title: "Prompt → Video", desc: "Describe any video in plain language. AI detects style, pacing, and effects automatically.", color: "text-primary" },
+              { icon: Film, title: "Attach Your Media", desc: "Optionally add screenshots, images, or clips. They're woven into your video as cinematic scenes.", color: "text-cyan-400" },
+              { icon: Download, title: "Cinematic Output", desc: "Professional transitions, color grading, and effects — rendered and ready to share.", color: "text-violet-400" },
             ].map((item, i) => (
-              <div key={i} className="bg-black/60 backdrop-blur-sm p-8 md:p-10 flex flex-col gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center">
+              <div key={i} className="bg-[#09090f] p-8 md:p-10 flex flex-col gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
                   <item.icon className={`w-6 h-6 ${item.color}`} />
                 </div>
-                <h3 className="text-xl font-bold">{item.title}</h3>
-                <p className="text-white/50 leading-relaxed text-sm">{item.desc}</p>
+                <h3 className="text-lg font-bold">{item.title}</h3>
+                <p className="text-white/40 leading-relaxed text-sm">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── VIDEO FORMATS ── */}
-      <section className="py-20 relative border-t border-white/5">
+      {/* ── VIDEO FORMATS ─────────────────────────────────────────── */}
+      <section className="py-20 relative border-t border-white/[0.05]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-black tracking-tight">Every Format, One Prompt</h2>
-            <p className="text-white/40 mt-3 text-base">Just describe your idea — the style is detected automatically</p>
+            <p className="text-white/35 mt-3 text-base">Click any format to auto-fill a matching prompt</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 max-w-5xl mx-auto">
             {[
-              { name: "Ads", icon: Target, gradient: "from-amber-500/15", border: "hover:border-amber-500/40", prompt: "Create a high-converting commercial ad for a premium product" },
-              { name: "Horror", icon: Ghost, gradient: "from-red-500/15", border: "hover:border-red-500/40", prompt: "Make a dark cinematic horror trailer with eerie atmosphere" },
-              { name: "Promo", icon: MonitorPlay, gradient: "from-violet-500/15", border: "hover:border-violet-500/40", prompt: "Create a brand promo video with smooth modern transitions" },
-              { name: "Reels", icon: Smartphone, gradient: "from-pink-500/15", border: "hover:border-pink-500/40", prompt: "Make a short punchy reel with dynamic cuts and music" },
-              { name: "Vlogs", icon: Video, gradient: "from-cyan-500/15", border: "hover:border-cyan-500/40", prompt: "Create a personal vlog with warm lifestyle visuals" },
-              { name: "Shorts", icon: Clapperboard, gradient: "from-green-500/15", border: "hover:border-green-500/40", prompt: "Make a viral social media short with fast pacing" },
+              { name: "Ads", icon: Target, gradient: "from-amber-500/15", border: "hover:border-amber-500/40", prompt: "Create a high-converting commercial ad for a premium product with bold visuals" },
+              { name: "Horror", icon: Ghost, gradient: "from-red-500/15", border: "hover:border-red-500/40", prompt: "Make a dark cinematic horror trailer with eerie atmosphere and dramatic cuts" },
+              { name: "Promo", icon: MonitorPlay, gradient: "from-violet-500/15", border: "hover:border-violet-500/40", prompt: "Create a brand promo video with smooth modern transitions and clean typography" },
+              { name: "Reels", icon: Smartphone, gradient: "from-pink-500/15", border: "hover:border-pink-500/40", prompt: "Make a short punchy reel with dynamic cuts and trending music" },
+              { name: "Vlogs", icon: Video, gradient: "from-cyan-500/15", border: "hover:border-cyan-500/40", prompt: "Create a personal lifestyle vlog with warm visuals and natural pacing" },
+              { name: "Shorts", icon: Clapperboard, gradient: "from-green-500/15", border: "hover:border-green-500/40", prompt: "Make a viral social media short with fast pacing and bold text overlays" },
             ].map((type, i) => (
-              <button
+              <motion.button
                 key={i}
                 type="button"
+                whileHover={{ scale: 1.04, y: -2 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => { form.setValue("prompt", type.prompt); scrollToSection("create"); }}
-                className={`group p-5 rounded-2xl border border-white/5 bg-gradient-to-br ${type.gradient} to-transparent backdrop-blur-md transition-all duration-200 ${type.border} hover:scale-[1.03] hover:shadow-lg text-left`}
+                className={`group p-5 rounded-2xl border border-white/[0.06] bg-gradient-to-br ${type.gradient} to-transparent backdrop-blur-md transition-all duration-200 ${type.border} hover:shadow-lg text-left`}
               >
-                <type.icon className="w-7 h-7 mb-3 text-white/60 group-hover:text-white transition-colors" />
+                <type.icon className="w-7 h-7 mb-3 text-white/50 group-hover:text-white transition-colors duration-200" />
                 <p className="text-sm font-bold">{type.name}</p>
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <section id="how-it-works" className="py-20 relative border-t border-white/5">
+      {/* ── HOW IT WORKS ──────────────────────────────────────────── */}
+      <section id="how-it-works" className="py-20 relative border-t border-white/[0.05]">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center mb-14">
             <h2 className="text-3xl md:text-4xl font-black tracking-tight">From Prompt to Video in Seconds</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {[
-              { num: "01", icon: Sparkles, title: "Write Your Prompt", desc: "Describe the video you want. Our AI reads your intent and auto-detects the perfect style." },
-              { num: "02", icon: Paperclip, title: "Attach & Configure", desc: "Optionally upload screenshots or clips. Set your duration and plan quality." },
-              { num: "03", icon: Download, title: "Download & Share", desc: "Your cinematic video is rendered, graded, and ready to download in minutes." },
+              { icon: Sparkles, title: "Write Your Prompt", desc: "Describe the video you want. AI reads your intent and auto-detects the perfect style." },
+              { icon: Film, title: "Attach & Configure", desc: "Optionally upload screenshots or clips. Set duration and plan quality." },
+              { icon: Download, title: "Download & Share", desc: "Your cinematic video is rendered, graded, and ready to download." },
             ].map((step, i) => (
               <div key={i} className="relative text-center">
                 {i < 2 && (
-                  <div className="hidden md:block absolute top-10 left-[calc(50%+40px)] right-[-calc(50%-40px)] h-px bg-gradient-to-r from-white/20 to-transparent" />
+                  <div className="hidden md:block absolute top-10 left-[calc(50%+44px)] right-[-calc(50%-44px)] h-px bg-gradient-to-r from-primary/30 to-transparent" />
                 )}
-                <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-5 relative">
-                  <span className="absolute -top-2.5 -left-2.5 w-6 h-6 rounded-full bg-primary text-white text-xs font-black flex items-center justify-center">{i + 1}</span>
-                  <step.icon className="w-8 h-8 text-white/70" />
+                <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-5 relative shadow-[0_0_30px_-10px_rgba(139,92,246,0.3)]">
+                  <span className="absolute -top-2.5 -left-2.5 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-violet-600 text-white text-xs font-black flex items-center justify-center shadow-[0_0_10px_-3px_rgba(139,92,246,0.8)]">{i + 1}</span>
+                  <step.icon className="w-8 h-8 text-white/60" />
                 </div>
                 <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{step.desc}</p>
+                <p className="text-sm text-white/40 leading-relaxed">{step.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── PLAN SELECTOR ── */}
-      <section className="py-20 relative border-t border-white/5">
+      {/* ── PLAN SELECTOR ─────────────────────────────────────────── */}
+      <section className="py-20 relative border-t border-white/[0.05]">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Choose Your Plan</h2>
-            <p className="text-white/40 text-base">Upgrade for higher quality, longer videos, and AI story generation.</p>
+            <p className="text-white/35 text-base">Upgrade for higher quality, longer videos, and AI story generation.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {plans?.map((plan) => (

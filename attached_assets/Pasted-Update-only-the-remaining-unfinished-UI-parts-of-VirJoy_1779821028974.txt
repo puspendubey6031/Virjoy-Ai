@@ -1,0 +1,101 @@
+Update only the remaining unfinished UI parts of VirJoy AI.
+
+Do NOT redesign the whole homepage again.
+Keep the current modern prompt-first layout.
+
+Only improve and add these remaining features:
+
+--------------------------------------------------
+1. MAKE THE MAIN PROMPT BOX MORE PREMIUM
+--------------------------------------------------
+
+Improve the existing prompt textarea:
+- make it taller
+- add glowing purple focus border
+- animated gradient outline
+- smoother shadows
+- larger placeholder text
+- more cinematic AI feel
+
+Keep current layout structure.
+
+--------------------------------------------------
+2. ADD PLATFORM RATIO SELECTOR
+--------------------------------------------------
+
+Below the prompt box add a compact modern ratio selector.
+
+Options:
+- YouTube Long (16:9)
+- YouTube Shorts (9:16)
+- Instagram Reel (9:16)
+- Facebook Video (1:1)
+- TikTok (9:16)
+
+Use modern pill buttons or dropdown style.
+
+--------------------------------------------------
+3. IMPROVE MEDIA ATTACHMENT AREA
+--------------------------------------------------
+
+Keep the current attachment system but improve UI.
+
+Compact inline buttons:
+[ + Images ]
+[ + Clips ]
+[ + Screenshots ]
+
+Uploaded files should appear as small modern chips/cards below the prompt box.
+
+--------------------------------------------------
+4. IMPROVE GENERATE BUTTON
+--------------------------------------------------
+
+Update the existing Generate button:
+- glowing purple gradient
+- cinematic hover animation
+- loading animation
+- premium AI SaaS style
+
+Button text:
+"Generate Cinematic Video"
+
+--------------------------------------------------
+5. ADD EXAMPLE PROMPTS
+--------------------------------------------------
+
+Below the prompt box add clickable example prompts.
+
+Examples:
+- Create a cinematic app promo
+- Generate a horror trailer
+- Create a YouTube Shorts ad
+- Make a vlog intro
+
+Clicking should auto-fill the textarea.
+
+--------------------------------------------------
+6. ADD AI GENERATION STATES
+--------------------------------------------------
+
+During rendering show animated states:
+- analyzing prompt
+- building scenes
+- syncing audio
+- rendering cinematic video
+
+Use cinematic animated loaders.
+
+--------------------------------------------------
+7. FINAL DESIGN POLISH
+--------------------------------------------------
+
+Keep the current UI structure.
+Only polish:
+- spacing
+- gradients
+- glow effects
+- animations
+- typography
+
+Make the app feel more premium and cinematic like InVideo AI and RunwayML.
