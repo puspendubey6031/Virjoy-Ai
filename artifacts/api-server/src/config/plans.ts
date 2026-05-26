@@ -22,7 +22,7 @@ export const PLANS: PlanConfig[] = [
     watermark: true,
     quality: "low",
     aiStory: false,
-    description: "1 image, 1 clip (10s max), 10–30s video, watermark, low quality",
+    description: "Get started with basic cinematic video creation for free",
   },
   {
     id: "starter",
@@ -34,7 +34,7 @@ export const PLANS: PlanConfig[] = [
     watermark: false,
     quality: "standard",
     aiStory: false,
-    description: "Up to 1 minute video, 1–3 images, multiple clips, no watermark, standard quality",
+    description: "Monthly subscription for basic cinematic video creation",
   },
   {
     id: "creator",
@@ -46,7 +46,7 @@ export const PLANS: PlanConfig[] = [
     watermark: false,
     quality: "high",
     aiStory: false,
-    description: "Up to 2 minutes, better templates, faster processing, high quality",
+    description: "Monthly subscription with enhanced effects and smart AI tools",
   },
   {
     id: "premium",
@@ -58,7 +58,7 @@ export const PLANS: PlanConfig[] = [
     watermark: false,
     quality: "high",
     aiStory: true,
-    description: "Up to 3 minutes, AI Idea Box, full AI story generation, priority, commercial use",
+    description: "Monthly subscription with full AI idea-to-video generation",
   },
 ];
 

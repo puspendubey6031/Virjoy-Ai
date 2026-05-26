@@ -70,7 +70,7 @@ export function PlanCard({ plan, isSelected, onSelect, displayOnly = false }: Pl
           <span className="text-4xl font-black tracking-tighter">
             {plan.price === 0 ? "Free" : `₹${plan.price}`}
           </span>
-          {plan.price > 0 && <span className="text-sm font-medium text-white/50">/video</span>}
+          {plan.price > 0 && <span className="text-sm font-medium text-white/50">/month</span>}
         </div>
       </div>
 
