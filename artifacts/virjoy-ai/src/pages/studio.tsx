@@ -25,7 +25,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Sparkles, Wand2, CheckCircle2,
   Target, Ghost, MonitorPlay, Smartphone, Clapperboard, Video,
-  Download, Activity, X, ImageIcon, Film, Monitor, ScanLine, Cpu, Zap
+  Download, Activity, X, ImageIcon, Film, Monitor, ScanLine, Cpu, Zap,
+  Languages, Globe, Mic, Palette
 } from "lucide-react";
 
 const formSchema = z.object({
@@ -68,6 +69,40 @@ const GENERATION_STEPS = [
   { icon: Film, label: "Rendering cinematic video", color: "text-emerald-400" },
 ];
 
+// ── AI narration settings (language / voice / tone) ──────────────────────────
+const LANGUAGE_OPTIONS = [
+  { value: "bn-IN", label: "Bengali" },
+  { value: "hi-IN", label: "Hindi" },
+  { value: "en-IN", label: "English (India)" },
+  { value: "en-US", label: "English (US)" },
+  { value: "gu-IN", label: "Gujarati" },
+  { value: "mr-IN", label: "Marathi" },
+  { value: "ta-IN", label: "Tamil" },
+  { value: "te-IN", label: "Telugu" },
+  { value: "ur-IN", label: "Urdu" },
+];
+
+const VOICE_OPTIONS = [
+  "Indian Female Natural",
+  "Indian Male Natural",
+  "Hindi Female Neural Voice",
+  "Hindi Male Neural Voice",
+  "Bengali Female Voice",
+  "English Indian Female Voice",
+  "US Female Neural Voice",
+  "US Male Neural Voice",
+];
+
+const TONE_OPTIONS = [
+  "Normal",
+  "Friendly",
+  "Funny",
+  "Emotional",
+  "Cinematic",
+  "Professional",
+  "Energetic",
+];
+
 export default function Studio() {
   const { data: plans } = useGetPlans();
   const createVideoJob = useCreateVideoJob();
@@ -84,6 +119,11 @@ export default function Studio() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedRatio, setSelectedRatio] = useState("16:9");
   const [genStep, setGenStep] = useState(0);
+
+  // AI narration settings — used by the video generation pipeline later
+  const [selectedLanguage, setSelectedLanguage] = useState("hi-IN");
+  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0]);
+  const [selectedTone, setSelectedTone] = useState("Normal");
 
   const { data: activeJob } = useGetVideo(activeJobId || "", {
     query: {
@@ -471,6 +511,72 @@ export default function Studio() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* ── AI SETTINGS PANEL (language / voice / tone) ── */}
+                <div className="mb-4 rounded-2xl border border-white/[0.08] bg-[#0d0d14] p-4 sm:p-5 text-left shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_20px_60px_-30px_rgba(0,0,0,0.8)]">
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/80 to-cyan-500/80 flex items-center justify-center shrink-0">
+                      <Languages className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white/90 leading-tight">AI Voice &amp; Language</p>
+                      <p className="text-[11px] text-white/35 leading-tight">Pick language, voice and tone for narration</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Language */}
+                    <div className="space-y-1.5">
+                      <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">
+                        <Globe className="w-3 h-3 text-primary" /> Language
+                      </label>
+                      <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                        <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 hover:bg-white/8 hover:text-white/90 transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGE_OPTIONS.map(l => (
+                            <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Voice */}
+                    <div className="space-y-1.5">
+                      <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">
+                        <Mic className="w-3 h-3 text-primary" /> Voice
+                      </label>
+                      <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                        <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 hover:bg-white/8 hover:text-white/90 transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VOICE_OPTIONS.map(v => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Tone */}
+                    <div className="space-y-1.5">
+                      <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">
+                        <Palette className="w-3 h-3 text-primary" /> Tone
+                      </label>
+                      <Select value={selectedTone} onValueChange={setSelectedTone}>
+                        <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 hover:bg-white/8 hover:text-white/90 transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TONE_OPTIONS.map(t => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* ── GENERATE BUTTON ── */}
