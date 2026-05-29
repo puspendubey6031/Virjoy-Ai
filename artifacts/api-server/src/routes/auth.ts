@@ -21,13 +21,16 @@ router.post("/auth/register", async (req, res) => {
     return;
   }
 
-  const { firebaseToken, username } = req.body as {
-    firebaseToken?: string;
-    username?: string;
-  };
+  // Token is sent in the Authorization header by the frontend; fall back to
+  // the request body for backwards compatibility.
+  const authHeader = req.headers.authorization;
+  const firebaseToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : (req.body as { firebaseToken?: string }).firebaseToken;
+  const { username } = req.body as { username?: string };
 
   if (!firebaseToken) {
-    res.status(400).json({ error: "firebaseToken is required" });
+    res.status(401).json({ error: "Authorization token required" });
     return;
   }
 
