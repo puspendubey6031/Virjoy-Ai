@@ -1,5 +1,10 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  type Auth,
+} from "firebase/auth";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Firebase configuration
@@ -40,6 +45,10 @@ if (isFirebaseConfigured) {
           })
         : getApps()[0]!;
     _auth = getAuth(_app);
+    // Keep users signed in across page reloads and browser sessions.
+    setPersistence(_auth, browserLocalPersistence).catch((err) => {
+      console.warn("[VirJoy] Failed to set auth persistence:", err);
+    });
   } catch (err) {
     console.warn("[VirJoy] Firebase initialization failed:", err);
   }
