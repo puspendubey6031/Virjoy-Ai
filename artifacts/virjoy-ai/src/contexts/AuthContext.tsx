@@ -125,7 +125,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) throw new Error("Firebase is not configured");
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const token = await cred.user.getIdToken(true);
-    const backend = await syncWithBackend(token);
+    // Sign-in only fetches the existing profile — it must NOT register/provision
+    // an account. If no record exists, the user never finished phone verification.
+    const backend = await fetchDbUser(token);
+    if (!backend) {
+      const err = new Error(
+        "Please finish phone verification to activate your account.",
+      ) as Error & { code?: string };
+      err.code = "auth/registration-incomplete";
+      throw err;
+    }
     setDbUser(backend);
     return backend;
   }, []);

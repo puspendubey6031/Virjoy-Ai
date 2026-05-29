@@ -42,8 +42,18 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
-    const mobileVerified = !!decoded.phone_number;
-    const mobileNumber = decoded.phone_number ?? null;
+    // Dual verification: an account may only be provisioned (and granted free
+    // credits) once phone OTP has been completed. Without a linked phone number
+    // we refuse — this prevents email-only signups from bypassing verification.
+    if (!decoded.phone_number) {
+      res.status(403).json({
+        error: "Phone verification required to complete registration.",
+      });
+      return;
+    }
+
+    const mobileVerified = true;
+    const mobileNumber = decoded.phone_number;
 
     // Upsert user record
     const existing = await db

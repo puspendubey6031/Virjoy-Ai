@@ -465,6 +465,8 @@ function firebaseMsg(code?: string, context?: "login" | "signup" | "phone" | "ot
       case "auth/invalid-credential": return "Incorrect email or password.";
       case "auth/too-many-requests": return "Too many attempts. Please wait and try again.";
       case "auth/user-disabled": return "This account has been disabled.";
+      case "auth/registration-incomplete":
+        return "Please finish phone verification to activate your account. Use Create Account to complete it.";
       default: return "Sign in failed. Please try again.";
     }
   }
