@@ -21,12 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Sparkles, Wand2, CheckCircle2,
   Target, Ghost, MonitorPlay, Smartphone, Clapperboard, Video,
   Download, Activity, X, ImageIcon, Film, Monitor, ScanLine, Cpu, Zap,
-  Languages, Globe, Mic, Palette
+  Languages, Globe, Mic, Palette, Captions
 } from "lucide-react";
 
 const formSchema = z.object({
@@ -124,6 +125,7 @@ export default function Studio() {
   const [selectedLanguage, setSelectedLanguage] = useState("hi-IN");
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0]);
   const [selectedTone, setSelectedTone] = useState("Normal");
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
 
   const { data: activeJob } = useGetVideo(activeJobId || "", {
     query: {
@@ -575,6 +577,31 @@ export default function Studio() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+
+                  {/* ── SUBTITLE TOGGLE ── */}
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <Captions className="w-4 h-4 text-primary shrink-0" />
+                      <div className="leading-tight">
+                        <p className="text-sm font-semibold text-white/80">Subtitles</p>
+                        <p className="text-[11px] text-white/35">
+                          {subtitlesEnabled
+                            ? "Captions will be added automatically"
+                            : "Video will be generated without subtitles"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[11px] font-bold uppercase tracking-wide ${subtitlesEnabled ? "text-primary" : "text-white/30"}`}>
+                        {subtitlesEnabled ? "On" : "Off"}
+                      </span>
+                      <Switch
+                        checked={subtitlesEnabled}
+                        onCheckedChange={setSubtitlesEnabled}
+                        aria-label="Toggle subtitles"
+                      />
                     </div>
                   </div>
                 </div>
