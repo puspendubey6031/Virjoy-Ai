@@ -30,3 +30,9 @@ externalPort = 8081
 [[ports]]
 localPort = 25936
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_URL = "https://qevkbtfzfivuioqlbrzj.supabase.co/rest/v1/"
+SUPABASE_ANON_KEY = "sb_publishable_nfVo5uxkZ_OQGroxFgIAow_nR7CXsMJ"

@@ -22,6 +22,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from "@/component
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Sparkles, Wand2, CheckCircle2,
@@ -126,6 +127,8 @@ export default function Studio() {
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0]);
   const [selectedTone, setSelectedTone] = useState("Normal");
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState("9:16");
+  const [mediaLink, setMediaLink] = useState("");
 
   const { data: activeJob } = useGetVideo(activeJobId || "", {
     query: {
@@ -185,6 +188,8 @@ export default function Studio() {
     images.forEach(img => formData.append("images", img));
     clips.forEach(clip => formData.append("clips", clip));
     screenshots.forEach(s => formData.append("images", s));
+    formData.append("aspectRatio", aspectRatio);
+    if (mediaLink.trim()) formData.append("mediaLink", mediaLink.trim());
     try {
       const job = await createVideoJob.mutateAsync({ data: formData as any });
       setActiveJobId(job.id);
@@ -512,6 +517,31 @@ export default function Studio() {
                         </Select>
                       </FormItem>
                     )}
+                  />
+
+                  {/* ── ASPECT RATIO ── */}
+                  <div className="flex-shrink-0">
+                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                      <SelectTrigger className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/60 hover:bg-white/8 hover:text-white/80 w-44 transition-colors">
+                        <SelectValue placeholder="Aspect Ratio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="9:16">9:16 (Vertical)</SelectItem>
+                        <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                        <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* ── MEDIA LINK ── */}
+                <div className="mb-4">
+                  <Input
+                    type="text"
+                    value={mediaLink}
+                    onChange={(e) => setMediaLink(e.target.value)}
+                    placeholder="Paste Image / Video / Amazon Product Link"
+                    className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 placeholder:text-white/30 hover:bg-white/8 focus-visible:ring-primary/40 transition-colors"
                   />
                 </div>
 
