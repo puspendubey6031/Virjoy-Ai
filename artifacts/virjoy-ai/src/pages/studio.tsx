@@ -540,7 +540,7 @@ export default function Studio() {
                     type="text"
                     value={mediaLink}
                     onChange={(e) => setMediaLink(e.target.value)}
-                    placeholder="Paste Image / Video / Amazon Product Link"
+                    placeholder="Paste Link (Image / Video / Amazon / Product)"
                     className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 placeholder:text-white/30 hover:bg-white/8 focus-visible:ring-primary/40 transition-colors"
                   />
                 </div>
