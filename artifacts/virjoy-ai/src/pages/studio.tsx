@@ -28,7 +28,7 @@ import {
   Loader2, Sparkles, Wand2, CheckCircle2,
   Target, Ghost, MonitorPlay, Smartphone, Clapperboard, Video,
   Download, Activity, X, ImageIcon, Film, Monitor, ScanLine, Cpu, Zap,
-  Languages, Globe, Mic, Palette, Captions
+  Languages, Globe, Mic, Palette, Captions, Link2
 } from "lucide-react";
 
 const formSchema = z.object({
@@ -129,6 +129,7 @@ export default function Studio() {
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [mediaLink, setMediaLink] = useState("");
+  const [showLinkInput, setShowLinkInput] = useState(false);
 
   const { data: activeJob } = useGetVideo(activeJobId || "", {
     query: {
@@ -350,6 +351,19 @@ export default function Studio() {
                           </button>
                         ))}
 
+                        {/* Link input toggle — additional media source */}
+                        <button
+                          type="button"
+                          onClick={() => setShowLinkInput(v => !v)}
+                          disabled={isGenerating}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/45 hover:text-white/80 hover:bg-white/8 transition-all disabled:opacity-35 disabled:cursor-not-allowed group/btn"
+                        >
+                          <span className="text-white/30 group-hover/btn:text-white/60 transition-colors font-bold text-base leading-none">+</span>
+                          <Link2 className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Link</span>
+                          {mediaLink.trim() && <span className="text-primary font-bold">(1)</span>}
+                        </button>
+
                         {/* detected style pill */}
                         <AnimatePresence>
                           {detectedStyle && (
@@ -385,6 +399,20 @@ export default function Studio() {
                         )}
                       </div>
                     </div>
+
+                    {/* ── LINK INPUT (additional media source) ── */}
+                    {(showLinkInput || mediaLink) && (
+                      <div className="px-4 py-3 border-t border-white/[0.05] bg-white/[0.015]">
+                        <Input
+                          type="url"
+                          value={mediaLink}
+                          onChange={(e) => setMediaLink(e.target.value)}
+                          placeholder="Paste link to generate video (Amazon / Product / Video URL)"
+                          autoFocus
+                          className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 placeholder:text-white/30 hover:bg-white/8 focus-visible:ring-primary/40 transition-colors"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -534,16 +562,6 @@ export default function Studio() {
                   </div>
                 </div>
 
-                {/* ── MEDIA LINK ── */}
-                <div className="mb-4">
-                  <Input
-                    type="text"
-                    value={mediaLink}
-                    onChange={(e) => setMediaLink(e.target.value)}
-                    placeholder="Paste Link (Image / Video / Amazon / Product)"
-                    className="h-9 bg-white/[0.04] border-white/10 rounded-xl text-sm text-white/70 placeholder:text-white/30 hover:bg-white/8 focus-visible:ring-primary/40 transition-colors"
-                  />
-                </div>
 
                 {/* ── AI SETTINGS PANEL (language / voice / tone) ── */}
                 <div className="mb-4 rounded-2xl border border-white/[0.08] bg-[#0d0d14] p-4 sm:p-5 text-left shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_20px_60px_-30px_rgba(0,0,0,0.8)]">
