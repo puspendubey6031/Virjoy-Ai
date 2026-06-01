@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
+import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -106,6 +108,8 @@ const TONE_OPTIONS = [
 ];
 
 export default function Studio() {
+  const [, navigate] = useLocation();
+  const { firebaseUser, authLoading } = useAuth();
   const { data: plans } = useGetPlans();
   const createVideoJob = useCreateVideoJob();
   const generateAiStory = useGenerateAiStory();
@@ -181,6 +185,20 @@ export default function Studio() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Wait for the session to resolve before deciding — avoids a bypass window
+    // while auth is still loading.
+    if (authLoading) return;
+
+    // Gate video generation behind authentication.
+    if (!firebaseUser) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to generate cinematic videos.",
+      });
+      navigate("/login");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("prompt", values.prompt);
     if (values.videoType) formData.append("videoType", values.videoType);

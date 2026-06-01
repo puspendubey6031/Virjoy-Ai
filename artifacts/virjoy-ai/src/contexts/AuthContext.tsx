@@ -6,17 +6,9 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import {
-  type User as FirebaseUser,
-  type ConfirmationResult,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  RecaptchaVerifier,
-  linkWithPhoneNumber,
-} from "firebase/auth";
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 // ── Backend user shape ────────────────────────────────────────────────────────
 export interface DbUser {
@@ -30,18 +22,24 @@ export interface DbUser {
   createdAt: string;
 }
 
+export interface SignUpResult {
+  /** True when Supabase requires email confirmation before a session exists. */
+  needsConfirmation: boolean;
+  dbUser: DbUser | null;
+}
+
 // ── Context type ──────────────────────────────────────────────────────────────
 interface AuthContextValue {
-  firebaseUser: FirebaseUser | null;
+  /** The authenticated Supabase user, or null. Kept as `firebaseUser` for
+   *  backwards compatibility with existing UI consumers. */
+  firebaseUser: SupabaseUser | null;
   dbUser: DbUser | null;
   authLoading: boolean;
-  /** True when Firebase env vars are set and the SDK is initialised. */
+  /** True when Supabase env vars are set and the client is initialised. */
   isConfigured: boolean;
-  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<SignUpResult>;
   signInWithEmail: (email: string, password: string) => Promise<DbUser>;
   signOut: () => Promise<void>;
-  sendPhoneOTP: (phoneNumber: string, recaptchaContainerId: string) => Promise<ConfirmationResult>;
-  confirmOTPAndLink: (confirmation: ConfirmationResult, otp: string) => Promise<DbUser>;
   refreshDbUser: () => Promise<void>;
   getToken: () => Promise<string | null>;
 }
@@ -60,6 +58,7 @@ function apiBase() {
   return base.endsWith("/") ? base.slice(0, -1) : base;
 }
 
+/** Provision-or-fetch the local user record from a Supabase access token. */
 async function syncWithBackend(token: string): Promise<DbUser> {
   const res = await fetch(`${apiBase()}/api/auth/register`, {
     method: "POST",
@@ -83,22 +82,39 @@ async function fetchDbUser(token: string): Promise<DbUser | null> {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<SupabaseUser | null>(null);
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(isFirebaseConfigured);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+
+  // Attach the Supabase access token to all generated API client requests so
+  // logged-in actions (e.g. video generation) are credited to the user.
+  useEffect(() => {
+    const client = supabase;
+    if (!isSupabaseConfigured || !client) return;
+    setAuthTokenGetter(async () => {
+      const { data } = await client.auth.getSession();
+      return data.session?.access_token ?? null;
+    });
+    return () => setAuthTokenGetter(null);
+  }, []);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
+    const client = supabase;
+    if (!isSupabaseConfigured || !client) {
       setAuthLoading(false);
       return;
     }
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
+    let active = true;
+
+    const applySession = async (session: Session | null) => {
+      if (!active) return;
+      setFirebaseUser(session?.user ?? null);
+      if (session?.access_token) {
         try {
-          const token = await user.getIdToken();
-          setDbUser(await fetchDbUser(token));
+          // Ensure a local record exists, then surface the latest profile.
+          const synced = await syncWithBackend(session.access_token).catch(() => null);
+          setDbUser(synced ?? (await fetchDbUser(session.access_token)));
         } catch {
           setDbUser(null);
         }
@@ -106,80 +122,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDbUser(null);
       }
       setAuthLoading(false);
+    };
+
+    // onAuthStateChange fires immediately with an INITIAL_SESSION event, so we
+    // rely on it alone — calling getSession() in parallel would trigger a
+    // duplicate backend sync (and a race on first-time registration).
+    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
 
-    return unsub;
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
-    if (!firebaseUser) return null;
-    return firebaseUser.getIdToken();
-  }, [firebaseUser]);
-
-  const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    if (!auth) throw new Error("Firebase is not configured");
-    await createUserWithEmailAndPassword(auth, email, password);
+    if (!supabase) return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
   }, []);
 
-  const signInWithEmail = useCallback(async (email: string, password: string): Promise<DbUser> => {
-    if (!auth) throw new Error("Firebase is not configured");
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const token = await cred.user.getIdToken(true);
-    // Sign-in only fetches the existing profile — it must NOT register/provision
-    // an account. If no record exists, the user never finished phone verification.
-    const backend = await fetchDbUser(token);
-    if (!backend) {
-      const err = new Error(
-        "Please finish phone verification to activate your account.",
-      ) as Error & { code?: string };
-      err.code = "auth/registration-incomplete";
-      throw err;
-    }
-    setDbUser(backend);
-    return backend;
-  }, []);
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string): Promise<SignUpResult> => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+
+      // When email confirmation is enabled, no session is returned until the
+      // user confirms via email.
+      if (!data.session) {
+        return { needsConfirmation: true, dbUser: null };
+      }
+
+      const synced = await syncWithBackend(data.session.access_token);
+      setDbUser(synced);
+      return { needsConfirmation: false, dbUser: synced };
+    },
+    [],
+  );
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<DbUser> => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.session) throw new Error("Sign in failed — no session returned");
+
+      const synced = await syncWithBackend(data.session.access_token);
+      setDbUser(synced);
+      return synced;
+    },
+    [],
+  );
 
   const signOut = useCallback(async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    if (!supabase) return;
+    await supabase.auth.signOut();
     setDbUser(null);
   }, []);
 
-  const sendPhoneOTP = useCallback(
-    async (phoneNumber: string, recaptchaContainerId: string): Promise<ConfirmationResult> => {
-      if (!auth) throw new Error("Firebase is not configured");
-      if (!auth.currentUser) throw new Error("Sign in with email first");
-
-      const existing = (window as any).__vrRecaptcha as RecaptchaVerifier | undefined;
-      if (existing) { try { existing.clear(); } catch { /* ignore */ } }
-
-      const verifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
-        size: "invisible",
-        callback: () => {},
-      });
-      (window as any).__vrRecaptcha = verifier;
-
-      return linkWithPhoneNumber(auth.currentUser, phoneNumber, verifier);
-    },
-    [],
-  );
-
-  const confirmOTPAndLink = useCallback(
-    async (confirmation: ConfirmationResult, otp: string): Promise<DbUser> => {
-      const result = await confirmation.confirm(otp);
-      const token = await result.user.getIdToken(true);
-      const backend = await syncWithBackend(token);
-      setDbUser(backend);
-      return backend;
-    },
-    [],
-  );
-
   const refreshDbUser = useCallback(async () => {
-    if (!firebaseUser) return;
-    const token = await firebaseUser.getIdToken();
+    const token = await getToken();
+    if (!token) return;
     setDbUser(await fetchDbUser(token));
-  }, [firebaseUser]);
+  }, [getToken]);
 
   return (
     <AuthContext.Provider
@@ -187,12 +194,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         dbUser,
         authLoading,
-        isConfigured: isFirebaseConfigured,
+        isConfigured: isSupabaseConfigured,
         signUpWithEmail,
         signInWithEmail,
         signOut,
-        sendPhoneOTP,
-        confirmOTPAndLink,
         refreshDbUser,
         getToken,
       }}

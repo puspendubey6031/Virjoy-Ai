@@ -32,17 +32,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const dbUser = await signInWithEmail(data.email, data.password);
-      if (!dbUser.mobileVerified) {
-        toast({ title: "Phone verification needed", description: "Please verify your mobile number." });
-        navigate("/signup?step=phone");
-        return;
-      }
       toast({ title: "Welcome back!", description: `Signed in as ${dbUser.email}` });
       navigate("/");
     } catch (err: any) {
       toast({
         title: "Sign in failed",
-        description: firebaseErrorMessage(err.code),
+        description: authErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -82,9 +77,9 @@ export default function LoginPage() {
           <div className="mb-4 flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm">
             <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold text-amber-300">Firebase not configured</p>
+              <p className="font-semibold text-amber-300">Authentication not configured</p>
               <p className="text-amber-400/70 mt-0.5">
-                Add your <code className="text-amber-300">VITE_FIREBASE_*</code> secrets to enable authentication. See <code>.env.example</code> for the full list.
+                Add your <code className="text-amber-300">VITE_SUPABASE_URL</code> and <code className="text-amber-300">VITE_SUPABASE_ANON_KEY</code> secrets to enable authentication.
               </p>
             </div>
           </div>
@@ -161,19 +156,19 @@ export default function LoginPage() {
   );
 }
 
-function firebaseErrorMessage(code?: string): string {
-  switch (code) {
-    case "auth/user-not-found":
-    case "auth/wrong-password":
-    case "auth/invalid-credential":
-      return "Incorrect email or password.";
-    case "auth/too-many-requests":
-      return "Too many attempts. Please wait and try again.";
-    case "auth/user-disabled":
-      return "This account has been disabled.";
-    case "auth/network-request-failed":
-      return "Network error. Check your connection.";
-    default:
-      return "Sign in failed. Please try again.";
+function authErrorMessage(err?: any): string {
+  const msg = (err?.message ?? "").toLowerCase();
+  if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+    return "Incorrect email or password.";
   }
+  if (msg.includes("email not confirmed")) {
+    return "Please confirm your email before signing in.";
+  }
+  if (msg.includes("rate limit") || msg.includes("too many")) {
+    return "Too many attempts. Please wait and try again.";
+  }
+  if (msg.includes("network") || msg.includes("fetch")) {
+    return "Network error. Check your connection.";
+  }
+  return err?.message || "Sign in failed. Please try again.";
 }

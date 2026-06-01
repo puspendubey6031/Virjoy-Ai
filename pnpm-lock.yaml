@@ -426,6 +426,9 @@ importers:
 
   artifacts/virjoy-ai:
     dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.106.2
+        version: 2.106.2
       firebase:
         specifier: ^12.13.0
         version: 12.13.0

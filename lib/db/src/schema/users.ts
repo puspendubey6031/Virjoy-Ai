@@ -2,7 +2,8 @@ import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
-  firebaseUid: text("firebase_uid").notNull().unique(),
+  firebaseUid: text("firebase_uid").unique(),
+  supabaseUid: text("supabase_uid").unique(),
   email: text("email").notNull().unique(),
   mobileNumber: text("mobile_number").unique(),
   mobileVerified: boolean("mobile_verified").notNull().default(false),

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, usersTable, creditLogsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { verifyFirebaseToken, isFirebaseReady } from "../services/firebase";
+import { verifySupabaseToken, isSupabaseAuthReady } from "../services/supabaseAuth";
 import { addCredits, PLAN_MONTHLY_CREDITS } from "../services/credits";
 import { requireAuth, requireMobileVerified } from "../middleware/auth";
 
@@ -10,117 +11,125 @@ const router = Router();
 /**
  * POST /api/auth/register
  *
- * Called by the frontend after Firebase sign-up. The Firebase ID token must
- * include a linked phone number (Firebase phone auth must be completed first).
+ * Called by the frontend after a Supabase email/password sign-up or sign-in.
+ * Idempotently provisions the local user record from the Supabase access token
+ * and grants welcome credits on first registration.
  *
- * Body: { firebaseToken: string, username?: string }
+ * Auth: Supabase access token in the Authorization header.
+ * Body: { username?: string }
  */
 router.post("/auth/register", async (req, res) => {
-  if (!isFirebaseReady()) {
+  if (!isSupabaseAuthReady()) {
     res.status(503).json({ error: "Authentication service not configured" });
     return;
   }
 
-  // Token is sent in the Authorization header by the frontend; fall back to
-  // the request body for backwards compatibility.
   const authHeader = req.headers.authorization;
-  const firebaseToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : (req.body as { firebaseToken?: string }).firebaseToken;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
   const { username } = req.body as { username?: string };
 
-  if (!firebaseToken) {
+  if (!token) {
     res.status(401).json({ error: "Authorization token required" });
     return;
   }
 
   try {
-    const decoded = await verifyFirebaseToken(firebaseToken);
+    const decoded = await verifySupabaseToken(token);
 
     if (!decoded.email) {
-      res.status(400).json({ error: "Firebase account must have a verified email" });
+      res.status(400).json({ error: "Account must have a verified email" });
       return;
     }
 
-    // Dual verification: an account may only be provisioned (and granted free
-    // credits) once phone OTP has been completed. Without a linked phone number
-    // we refuse — this prevents email-only signups from bypassing verification.
-    if (!decoded.phone_number) {
-      res.status(403).json({
-        error: "Phone verification required to complete registration.",
-      });
-      return;
-    }
-
-    const mobileVerified = true;
-    const mobileNumber = decoded.phone_number;
-
-    // Upsert user record
-    const existing = await db
+    // 1. Returning Supabase user — update profile and return.
+    const [bySupabase] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.firebaseUid, decoded.uid));
+      .where(eq(usersTable.supabaseUid, decoded.id));
 
-    let user;
-
-    if (existing.length > 0) {
-      // Update returning user
+    if (bySupabase) {
       const [updated] = await db
         .update(usersTable)
         .set({
           email: decoded.email,
-          mobileNumber: mobileNumber ?? existing[0].mobileNumber,
-          mobileVerified: mobileVerified || existing[0].mobileVerified,
-          username: username ?? existing[0].username,
+          username: username ?? bySupabase.username,
           updatedAt: new Date(),
         })
-        .where(eq(usersTable.firebaseUid, decoded.uid))
+        .where(eq(usersTable.supabaseUid, decoded.id))
         .returning();
-      user = updated;
-    } else {
-      // New registration — grant free credits
-      const [created] = await db
-        .insert(usersTable)
-        .values({
-          firebaseUid: decoded.uid,
-          email: decoded.email,
-          mobileNumber,
-          mobileVerified,
-          username: username ?? decoded.name ?? null,
-          currentPlan: "free",
-          credits: 0,
-          freeCreditsLastClaimed: new Date(),
-        })
-        .returning();
-
-      user = created;
-
-      // Grant 5 free welcome credits
-      await addCredits({
-        userId: user.id,
-        amount: PLAN_MONTHLY_CREDITS.free,
-        action: "free_credit",
-        description: "Welcome credits for new account",
-      });
-
-      // Fetch updated user with credits
-      const [fresh] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
-      user = fresh;
+      req.log.info({ userId: updated.id }, "User profile updated");
+      res.status(201).json(formatUser(updated));
+      return;
     }
 
-    req.log.info({ userId: user.id, email: user.email, mobileVerified }, "User registered/updated");
-    res.status(201).json(formatUser(user));
+    // 2. Legacy account with the same email (e.g. pre-migration Firebase user
+    //    without a supabaseUid) — link it rather than create a duplicate. No
+    //    new welcome credits are granted for an existing account.
+    const [byEmail] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, decoded.email));
+
+    if (byEmail) {
+      const [linked] = await db
+        .update(usersTable)
+        .set({
+          supabaseUid: decoded.id,
+          username: username ?? byEmail.username,
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, byEmail.id))
+        .returning();
+      req.log.info({ userId: linked.id }, "Linked existing account to Supabase");
+      res.status(201).json(formatUser(linked));
+      return;
+    }
+
+    // 3. New registration. `onConflictDoNothing` guards against a concurrent
+    //    duplicate insert (two register calls firing for the same fresh
+    //    session) so welcome credits are granted exactly once — only the
+    //    insert that actually creates the row proceeds to grant credits.
+    const inserted = await db
+      .insert(usersTable)
+      .values({
+        supabaseUid: decoded.id,
+        email: decoded.email,
+        mobileVerified: true,
+        username: username ?? null,
+        currentPlan: "free",
+        credits: 0,
+        freeCreditsLastClaimed: new Date(),
+      })
+      .onConflictDoNothing({ target: usersTable.supabaseUid })
+      .returning();
+
+    if (inserted.length === 0) {
+      // A concurrent request won the insert — return that record without
+      // granting a second batch of credits.
+      const [existing] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.supabaseUid, decoded.id));
+      res.status(201).json(formatUser(existing));
+      return;
+    }
+
+    const created = inserted[0];
+
+    // Grant 5 free welcome credits (exactly once, for the real new account).
+    await addCredits({
+      userId: created.id,
+      amount: PLAN_MONTHLY_CREDITS.free,
+      action: "free_credit",
+      description: "Welcome credits for new account",
+    });
+
+    const [fresh] = await db.select().from(usersTable).where(eq(usersTable.id, created.id));
+    req.log.info({ userId: fresh.id, email: fresh.email }, "New user registered");
+    res.status(201).json(formatUser(fresh));
   } catch (err: any) {
     req.log.error({ err }, "Registration failed");
-    if (err.code === "auth/id-token-expired") {
-      res.status(401).json({ error: "Token expired. Please sign in again." });
-      return;
-    }
-    if (err.code?.startsWith("auth/")) {
-      res.status(401).json({ error: "Invalid Firebase token" });
-      return;
-    }
-    res.status(500).json({ error: "Registration failed. Please try again." });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 });
 

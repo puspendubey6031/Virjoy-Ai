@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyFirebaseToken, isFirebaseReady } from "../services/firebase";
+import { verifySupabaseToken, isSupabaseAuthReady } from "../services/supabaseAuth";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -11,7 +11,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  if (!isFirebaseReady()) {
+  if (!isSupabaseAuthReady()) {
     res.status(503).json({ error: "Authentication service not configured" });
     return;
   }
@@ -19,11 +19,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const token = authHeader.slice(7);
 
   try {
-    const decoded = await verifyFirebaseToken(token);
+    const decoded = await verifySupabaseToken(token);
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.firebaseUid, decoded.uid));
+      .where(eq(usersTable.supabaseUid, decoded.id));
 
     if (!user) {
       res.status(401).json({
@@ -35,7 +35,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = user;
     next();
   } catch (err: any) {
-    req.log?.warn?.({ err: err.message }, "Firebase token verification failed");
+    req.log?.warn?.({ err: err.message }, "Supabase token verification failed");
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }
@@ -61,7 +61,7 @@ export async function optionalAuth(
   next: NextFunction,
 ): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ") || !isFirebaseReady()) {
+  if (!authHeader?.startsWith("Bearer ") || !isSupabaseAuthReady()) {
     next();
     return;
   }
@@ -69,11 +69,11 @@ export async function optionalAuth(
   const token = authHeader.slice(7);
 
   try {
-    const decoded = await verifyFirebaseToken(token);
+    const decoded = await verifySupabaseToken(token);
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.firebaseUid, decoded.uid));
+      .where(eq(usersTable.supabaseUid, decoded.id));
     if (user) req.user = user;
   } catch {
     // Non-blocking — invalid token in optional context is ignored
