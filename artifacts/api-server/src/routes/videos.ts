@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { PLAN_MAP, VALID_PLANS, VALID_DURATIONS } from "../config/plans";
 import { processVideo } from "../lib/videoProcessor";
 import { logger } from "../lib/logger";
-import { optionalAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 import {
   calculateCreditCost,
   hasSufficientCredits,
@@ -81,7 +81,7 @@ router.get("/videos/summary", async (req, res) => {
 // POST /api/videos
 router.post(
   "/videos",
-  optionalAuth,
+  requireAuth,
   upload.fields([
     { name: "images", maxCount: 10 },
     { name: "clips", maxCount: 20 },

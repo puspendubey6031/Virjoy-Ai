@@ -147,6 +147,15 @@ export default function Studio() {
     }
   } as any);
 
+  // ── Route guard ──────────────────────────────────────────────────────────
+  // Video creation is for authenticated users only. Redirect immediately to
+  // /login when not signed in — the creation form must never render for guests.
+  useEffect(() => {
+    if (!authLoading && !firebaseUser) {
+      navigate("/login");
+    }
+  }, [authLoading, firebaseUser, navigate]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { prompt: "", videoType: undefined, duration: 30, plan: "free" },
@@ -238,6 +247,19 @@ export default function Studio() {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  // Render nothing until auth resolves, and nothing for guests (they are being
+  // redirected to /login) — guarantees the creation form is never shown.
+  if (authLoading) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!firebaseUser) {
+    return null;
+  }
 
   return (
     <div className="w-full">
