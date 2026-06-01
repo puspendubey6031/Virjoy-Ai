@@ -218,6 +218,26 @@ export default function Studio() {
     }
   };
 
+  // Gate the Generate action BEFORE form validation runs. An unauthenticated
+  // user who clicks "Generate Cinematic Video" is redirected to /login
+  // immediately — the generation form never validates or submits for guests.
+  const handleGenerateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (authLoading) {
+      e.preventDefault();
+      return;
+    }
+    if (!firebaseUser) {
+      e.preventDefault();
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to generate cinematic videos.",
+      });
+      navigate("/login");
+      return;
+    }
+    form.handleSubmit(onSubmit)(e);
+  };
+
   const handleImageFiles = (files: FileList | null) => {
     if (!files) return;
     const max = selectedPlan?.maxImages || 1;
@@ -309,7 +329,7 @@ export default function Studio() {
             className="w-full"
           >
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
+              <form onSubmit={handleGenerateSubmit}>
 
                 {/* ── PROMPT BOX ── */}
                 <div className="relative group mb-3">
