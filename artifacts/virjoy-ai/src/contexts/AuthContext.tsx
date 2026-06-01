@@ -39,6 +39,10 @@ interface AuthContextValue {
   isConfigured: boolean;
   signUpWithEmail: (email: string, password: string) => Promise<SignUpResult>;
   signInWithEmail: (email: string, password: string) => Promise<DbUser>;
+  /** Send a password-reset email with a recovery link back to /reset-password. */
+  sendPasswordReset: (email: string) => Promise<void>;
+  /** Set a new password for the currently-authenticated (recovery) session. */
+  updatePassword: (newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshDbUser: () => Promise<void>;
   getToken: () => Promise<string | null>;
@@ -176,6 +180,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const sendPasswordReset = useCallback(async (email: string): Promise<void> => {
+    if (!supabase) throw new Error("Supabase is not configured");
+    const base = import.meta.env.BASE_URL ?? "/";
+    const redirectTo = `${window.location.origin}${base}reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string): Promise<void> => {
+    if (!supabase) throw new Error("Supabase is not configured");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -197,6 +215,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isConfigured: isSupabaseConfigured,
         signUpWithEmail,
         signInWithEmail,
+        sendPasswordReset,
+        updatePassword,
         signOut,
         refreshDbUser,
         getToken,

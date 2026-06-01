@@ -27,3 +27,28 @@ real insert grants. Keep the email-link branch so pre-migration accounts don't
 duplicate. `mobileVerified` is forced `true` because phone OTP was dropped in
 the Supabase migration — it's vestigial, kept only so `requireMobileVerified`
 routes still function.
+
+## Email confirmation is ENABLED on the Supabase project
+
+`signUp` returns **no session** — users must click the email link before
+`signInWithPassword` works (otherwise "Email not confirmed"). The signup flow
+returns `needsConfirmation: true` and shows a "check your email" state; this is
+expected, not a bug. To allow instant sign-in, the project owner must turn off
+"Confirm email" in the Supabase dashboard (Authentication settings) — it cannot
+be changed from code.
+
+**Verification note:** Supabase also rejects obviously-fake test emails
+("address is invalid"), and `viewEnvVars` in the code-execution sandbox masks
+secret *values* (returns `true` for presence only). So a fully-automated
+sign-in/session test isn't possible from the sandbox — needs a real inbox or
+email-confirmation disabled.
+
+## Password reset page must gate on PASSWORD_RECOVERY only
+
+`reset-password.tsx` must unlock the new-password form **only** after the
+`PASSWORD_RECOVERY` auth event (recovery link parsed from URL), never on any
+existing session. **Why:** unlocking on a normal logged-in session lets a user
+change the wrong account's password thinking they're completing a recovery
+flow. Show an explicit invalid/expired state with a "request new link" CTA when
+the URL carries no recovery payload (`type=recovery`/`access_token` in hash or
+`code=` in query).

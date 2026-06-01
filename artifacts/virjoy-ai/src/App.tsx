@@ -21,6 +21,8 @@ import Studio from "@/pages/studio";
 import HistoryPage from "@/pages/history";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AuthModal } from "@/components/auth-modal";
 
@@ -327,6 +329,8 @@ function Router() {
         <Route path="/history" component={HistoryPage} />
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route component={NotFound} />
       </Switch>
 
