@@ -48,27 +48,39 @@ export default function ResetPasswordPage() {
       hash.includes("type=recovery") || hash.includes("access_token") || search.includes("code=");
 
     let recovered = false;
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const markReady = () => {
       if (!active) return;
-      if (event === "PASSWORD_RECOVERY") {
-        recovered = true;
-        setReady(true);
-        setInvalid(false);
-      }
+      recovered = true;
+      setReady(true);
+      setInvalid(false);
+    };
+
+    // Primary signal: the PASSWORD_RECOVERY event Supabase emits after parsing
+    // a valid recovery link. This is the only reliable way to distinguish a
+    // recovery session from a normal logged-in session.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") markReady();
     });
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (!looksLikeRecovery) {
-      // Give URL-detection a brief moment, then mark invalid if no recovery
-      // event arrived.
-      timer = setTimeout(() => {
-        if (active && !recovered) setInvalid(true);
-      }, 1200);
+    // Fallback: only when the URL actually carries recovery params, accept an
+    // already-established session (covers the event firing before we
+    // subscribed). We never do this for plain navigation, so a normal logged-in
+    // user can't unlock the form for the wrong account.
+    if (looksLikeRecovery) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (active && !recovered && data.session) markReady();
+      });
     }
+
+    // Safety net: never deadlock. If no recovery context resolves within the
+    // grace period, surface an explicit invalid/expired state.
+    const timer = setTimeout(() => {
+      if (active && !recovered) setInvalid(true);
+    }, 2500);
 
     return () => {
       active = false;
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
       sub.subscription.unsubscribe();
     };
   }, []);

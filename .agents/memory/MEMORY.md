@@ -1,3 +1,4 @@
 - [Drizzle-ORM dual instance fix](drizzle-firebase-dedup.md) — firebase-admin causes two drizzle-orm copies; fix via pnpm-workspace.yaml override.
 - [Firebase Admin private key](firebase-admin-private-key.md) — rebuild the PEM from the base64 body; never trust pasted newlines, or cert() throws DECODER unsupported.
 - [Supabase auth register](supabase-auth-register.md) — /api/auth/register fires on every auth change; conflict-guard insert so welcome credits grant exactly once, link legacy email rows.
+- [Supabase password recovery gating](supabase-password-recovery.md) — gate reset form on PASSWORD_RECOVERY event (only signal that distinguishes recovery from a normal session); always add a timeout→invalid safety net so it never deadlocks.

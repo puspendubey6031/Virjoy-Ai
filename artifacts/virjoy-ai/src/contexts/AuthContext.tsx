@@ -150,7 +150,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = useCallback(
     async (email: string, password: string): Promise<SignUpResult> => {
       if (!supabase) throw new Error("Supabase is not configured");
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      // With email confirmation enabled, Supabase sends a confirmation link.
+      // Point it back at this app's login page so the user lands here after
+      // confirming (otherwise it falls back to the project's Site URL).
+      const base = import.meta.env.BASE_URL ?? "/";
+      const emailRedirectTo = `${window.location.origin}${base}login`;
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo },
+      });
       if (error) throw error;
 
       // When email confirmation is enabled, no session is returned until the
