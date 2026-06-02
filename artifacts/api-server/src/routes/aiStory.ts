@@ -1,36 +1,32 @@
 import { Router } from "express";
 import { ai } from "@workspace/integrations-gemini-ai";
-import { requireAuth, requireMobileVerified } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
+import { attachPlan, requireFeature } from "../middleware/planGuard";
 import { hasSufficientCredits, deductCredits, CREDIT_COSTS } from "../services/credits";
 
 const router = Router();
 
-router.post("/ai/story", async (req, res) => {
-  const { prompt, plan } = req.body as { prompt?: string; plan?: string };
+// AI story generation is gated behind the `aiStory` plan feature (Premium).
+// The plan is resolved from the authenticated user's DB record, not client input.
+router.post("/ai/story", requireAuth, attachPlan, requireFeature("aiStory"), async (req, res) => {
+  const { prompt } = req.body as { prompt?: string };
 
   if (!prompt?.trim()) {
     res.status(400).json({ error: "prompt is required" });
     return;
   }
 
-  if (plan !== "premium") {
-    res.status(403).json({ error: "AI story generation requires the Premium plan" });
+  // requireAuth guarantees an authenticated user at this point.
+  const user = req.user!;
+  const sufficient = await hasSufficientCredits(user.id, CREDIT_COSTS.aiStory);
+  if (!sufficient) {
+    res.status(402).json({
+      error: "Insufficient credits",
+      required: CREDIT_COSTS.aiStory,
+      available: user.credits,
+      message: `AI story generation costs ${CREDIT_COSTS.aiStory} credits. You have ${user.credits}.`,
+    });
     return;
-  }
-
-  // Credit check for authenticated users
-  const user = req.user;
-  if (user) {
-    const sufficient = await hasSufficientCredits(user.id, CREDIT_COSTS.aiStory);
-    if (!sufficient) {
-      res.status(402).json({
-        error: "Insufficient credits",
-        required: CREDIT_COSTS.aiStory,
-        available: user.credits,
-        message: `AI story generation costs ${CREDIT_COSTS.aiStory} credits. You have ${user.credits}.`,
-      });
-      return;
-    }
   }
 
   const systemPrompt = `You are a professional cinematic video script writer for VirJoy AI.

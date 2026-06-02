@@ -70,9 +70,11 @@ A prompt-first cinematic AI video generation SaaS platform. Users type a prompt,
 | Plan | Price | Credits/month | Max Duration | Watermark |
 |------|-------|--------------|-------------|-----------|
 | Free | Free | 5 (10-day validity, claimable monthly) | 30s | Yes |
-| Starter | ₹199 | 50 | 60s | No |
+| Starter | ₹199 | 50 | 60s | Yes |
 | Creator | ₹399 | 150 | 120s | No |
 | Premium | ₹799 | 400 | 180s + AI Story | No |
+
+Feature flags per plan (config in `plans.ts`): `enhancedCinematicEffects` & `priorityRendering` (Creator + Premium), `ideaToVideo` / AI Story (Premium only).
 
 **Credit costs:** 10s=2, 30s=6, 60s=12, 180s=30 | +2/clip | +3 creator/premium cinematic effects | +5 AI story | Images free
 

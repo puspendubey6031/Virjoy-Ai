@@ -20,5 +20,8 @@ export interface Plan {
   watermark: boolean;
   quality: PlanQuality;
   aiStory: boolean;
+  enhancedCinematicEffects?: boolean;
+  priorityRendering?: boolean;
+  ideaToVideo?: boolean;
   description?: string;
 }

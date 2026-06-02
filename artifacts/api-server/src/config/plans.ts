@@ -8,6 +8,9 @@ export interface PlanConfig {
   watermark: boolean;
   quality: "low" | "standard" | "high";
   aiStory: boolean;
+  enhancedCinematicEffects: boolean;
+  priorityRendering: boolean;
+  ideaToVideo: boolean;
   monthlyCredits: number;
   description: string;
   features: string[];
@@ -24,6 +27,9 @@ export const PLANS: PlanConfig[] = [
     watermark: true,
     quality: "low",
     aiStory: false,
+    enhancedCinematicEffects: false,
+    priorityRendering: false,
+    ideaToVideo: false,
     monthlyCredits: 5,
     description: "5 free credits every 30 days to get started",
     features: [
@@ -40,16 +46,19 @@ export const PLANS: PlanConfig[] = [
     maxImages: 3,
     maxClips: 5,
     maxDuration: 60,
-    watermark: false,
+    watermark: true,
     quality: "standard",
     aiStory: false,
+    enhancedCinematicEffects: false,
+    priorityRendering: false,
+    ideaToVideo: false,
     monthlyCredits: 50,
     description: "50 credits/month for growing creators",
     features: [
       "Prompt-Based Video Creation",
       "Smart Template Matching",
-      "No Watermark",
       "Standard Quality",
+      "Watermarked Output",
     ],
   },
   {
@@ -62,12 +71,16 @@ export const PLANS: PlanConfig[] = [
     watermark: false,
     quality: "high",
     aiStory: false,
+    enhancedCinematicEffects: true,
+    priorityRendering: true,
+    ideaToVideo: false,
     monthlyCredits: 150,
     description: "150 credits/month with enhanced cinematic effects",
     features: [
       "Enhanced Cinematic Effects",
       "Smart AI Assistance",
       "Priority Rendering",
+      "No Watermark",
       "High Quality Output",
     ],
   },
@@ -81,13 +94,19 @@ export const PLANS: PlanConfig[] = [
     watermark: false,
     quality: "high",
     aiStory: true,
+    enhancedCinematicEffects: true,
+    priorityRendering: true,
+    ideaToVideo: true,
     monthlyCredits: 400,
     description: "400 credits/month with full Gemini AI story generation",
     features: [
       "Full Gemini AI Story Generation",
-      "Cinematic AI Scene Building",
-      "Commercial Use License",
-      "Fastest Rendering",
+      "Idea-to-Video Generation",
+      "Automatic Story + Scene Creation",
+      "Enhanced Cinematic Effects",
+      "Priority Rendering",
+      "No Watermark",
+      "High Quality Output",
     ],
   },
 ];

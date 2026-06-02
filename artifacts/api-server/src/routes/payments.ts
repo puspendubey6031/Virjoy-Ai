@@ -59,25 +59,25 @@ router.post("/payments/order", requireAuth, requireMobileVerified, async (req, r
 /**
  * POST /api/payments/verify
  * Verify Razorpay payment signature, activate plan, and add credits.
+ * The plan and amount are derived from the trusted server-set order notes,
+ * not from client input.
  *
- * Body: { orderId, paymentId, signature, planId }
+ * Body: { orderId, paymentId, signature }
  */
 router.post("/payments/verify", requireAuth, requireMobileVerified, async (req, res) => {
-  const { orderId, paymentId, signature, planId } = req.body as {
-    orderId?: string;
-    paymentId?: string;
-    signature?: string;
-    planId?: string;
-  };
-
-  if (!orderId || !paymentId || !signature || !planId) {
-    res.status(400).json({ error: "orderId, paymentId, signature, and planId are required" });
+  if (!isRazorpayReady()) {
+    res.status(503).json({ error: "Payment service not configured" });
     return;
   }
 
-  const plan = PLANS.find((p) => p.id === planId && p.price > 0);
-  if (!plan) {
-    res.status(400).json({ error: "Invalid plan" });
+  const { orderId, paymentId, signature } = req.body as {
+    orderId?: string;
+    paymentId?: string;
+    signature?: string;
+  };
+
+  if (!orderId || !paymentId || !signature) {
+    res.status(400).json({ error: "orderId, paymentId, and signature are required" });
     return;
   }
 
@@ -89,6 +89,46 @@ router.post("/payments/verify", requireAuth, requireMobileVerified, async (req, 
   }
 
   const userId = req.user!.id;
+
+  // SECURITY: the plan and amount are derived from the Razorpay order's
+  // server-set notes (written at order creation) — NEVER from client input.
+  // This prevents a user from paying for a cheaper plan and claiming a higher one.
+  let order: { amount: string | number; status: string; notes?: Record<string, string | number> };
+  try {
+    order = (await razorpay!.orders.fetch(orderId)) as typeof order;
+  } catch (err: any) {
+    req.log.error({ err, orderId }, "Failed to fetch Razorpay order during verification");
+    res.status(400).json({ error: "Could not verify payment order." });
+    return;
+  }
+
+  const orderPlanId = order.notes?.planId ? String(order.notes.planId) : undefined;
+  const orderUserId = order.notes?.userId ? String(order.notes.userId) : undefined;
+
+  // Ensure the order belongs to the authenticated user.
+  if (orderUserId !== String(userId)) {
+    req.log.warn({ userId, orderId, orderUserId }, "Order ownership mismatch during verification");
+    res.status(403).json({ error: "This payment order does not belong to your account." });
+    return;
+  }
+
+  const plan = PLANS.find((p) => p.id === orderPlanId && p.price > 0);
+  if (!plan) {
+    res.status(400).json({ error: "Invalid plan on payment order" });
+    return;
+  }
+
+  // Ensure the amount paid matches the canonical plan price (in paise).
+  if (Number(order.amount) !== plan.price * 100) {
+    req.log.warn(
+      { userId, orderId, orderAmount: order.amount, expected: plan.price * 100 },
+      "Order amount mismatch during verification",
+    );
+    res.status(400).json({ error: "Payment amount does not match the plan price." });
+    return;
+  }
+
+  const planId = plan.id;
   const creditsToAdd = PLAN_MONTHLY_CREDITS[planId] ?? 0;
   const endsAt = new Date();
   endsAt.setMonth(endsAt.getMonth() + 1);

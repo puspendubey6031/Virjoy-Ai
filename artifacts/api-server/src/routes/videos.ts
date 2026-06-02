@@ -4,10 +4,11 @@ import path from "path";
 import fs from "fs/promises";
 import { db, videoJobsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { PLAN_MAP, VALID_PLANS, VALID_DURATIONS } from "../config/plans";
+import { VALID_DURATIONS } from "../config/plans";
 import { processVideo } from "../lib/videoProcessor";
 import { logger } from "../lib/logger";
 import { requireAuth } from "../middleware/auth";
+import { attachPlan } from "../middleware/planGuard";
 import {
   calculateCreditCost,
   hasSufficientCredits,
@@ -82,21 +83,22 @@ router.get("/videos/summary", async (req, res) => {
 router.post(
   "/videos",
   requireAuth,
+  attachPlan,
   upload.fields([
     { name: "images", maxCount: 10 },
     { name: "clips", maxCount: 20 },
   ]),
   async (req, res) => {
-    const { prompt, title, videoType: explicitType, duration, plan } = req.body as Record<string, string>;
+    const { prompt, title, videoType: explicitType, duration } = req.body as Record<string, string>;
     const files = req.files as Record<string, Express.Multer.File[]> | undefined;
 
     const images = files?.["images"] ?? [];
     const clips = files?.["clips"] ?? [];
 
-    if (!plan || !VALID_PLANS.includes(plan)) {
-      res.status(400).json({ error: "Invalid plan" });
-      return;
-    }
+    // Plan is derived from the authenticated user's DB record — never trusted
+    // from client input. This is the source of truth for all limit enforcement.
+    const planConfig = req.planConfig!;
+    const plan = planConfig.id;
 
     const durationNum = parseInt(duration, 10);
     if (!VALID_DURATIONS.includes(durationNum)) {
@@ -110,8 +112,6 @@ router.post(
         : prompt
         ? detectVideoType(prompt)
         : "promo";
-
-    const planConfig = PLAN_MAP[plan];
 
     if (images.length > planConfig.maxImages) {
       res.status(400).json({ error: `Your ${planConfig.name} plan allows max ${planConfig.maxImages} image(s)` });

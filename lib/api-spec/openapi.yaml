@@ -294,6 +294,12 @@ components:
           enum: [low, standard, high]
         aiStory:
           type: boolean
+        enhancedCinematicEffects:
+          type: boolean
+        priorityRendering:
+          type: boolean
+        ideaToVideo:
+          type: boolean
         description:
           type: string
 

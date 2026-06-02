@@ -113,6 +113,9 @@ export const GetPlansResponseItem = zod.object({
   "watermark": zod.boolean(),
   "quality": zod.enum(['low', 'standard', 'high']),
   "aiStory": zod.boolean(),
+  "enhancedCinematicEffects": zod.boolean().optional(),
+  "priorityRendering": zod.boolean().optional(),
+  "ideaToVideo": zod.boolean().optional(),
   "description": zod.string().optional()
 })
 export const GetPlansResponse = zod.array(GetPlansResponseItem)
