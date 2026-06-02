@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -40,3 +40,6 @@ externalPort = 80
 [userenv.shared]
 SUPABASE_URL = "https://qevkbtfzfivuioqlbrzj.supabase.co/rest/v1/"
 SUPABASE_ANON_KEY = "sb_publishable_nfVo5uxkZ_OQGroxFgIAow_nR7CXsMJ"
+
+[nix]
+channel = "stable-25_05"
