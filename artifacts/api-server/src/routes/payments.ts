@@ -3,7 +3,7 @@ import { db, usersTable, subscriptionsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { razorpay, isRazorpayReady, verifyPaymentSignature, verifyWebhookSignature } from "../services/razorpay";
 import { addCredits, PLAN_MONTHLY_CREDITS } from "../services/credits";
-import { requireAuth, requireMobileVerified } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 import { PLANS } from "../config/plans";
 
 const router = Router();
@@ -14,7 +14,7 @@ const router = Router();
  *
  * Body: { planId: "starter" | "creator" | "premium" }
  */
-router.post("/payments/order", requireAuth, requireMobileVerified, async (req, res) => {
+router.post("/payments/order", requireAuth, async (req, res) => {
   if (!isRazorpayReady()) {
     res.status(503).json({ error: "Payment service not configured" });
     return;
@@ -64,7 +64,7 @@ router.post("/payments/order", requireAuth, requireMobileVerified, async (req, r
  *
  * Body: { orderId, paymentId, signature }
  */
-router.post("/payments/verify", requireAuth, requireMobileVerified, async (req, res) => {
+router.post("/payments/verify", requireAuth, async (req, res) => {
   if (!isRazorpayReady()) {
     res.status(503).json({ error: "Payment service not configured" });
     return;
@@ -236,7 +236,7 @@ router.post("/payments/webhook", express_raw_body_middleware, async (req, res) =
  * GET /api/payments/history
  * Returns billing history for the current user.
  */
-router.get("/payments/history", requireAuth, requireMobileVerified, async (req, res) => {
+router.get("/payments/history", requireAuth, async (req, res) => {
   const subs = await db
     .select()
     .from(subscriptionsTable)

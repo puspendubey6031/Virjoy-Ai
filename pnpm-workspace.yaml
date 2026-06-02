@@ -159,6 +159,6 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
   # Force a single drizzle-orm instance across the entire workspace.
-  # Without this, firebase-admin's @opentelemetry/api peer causes pnpm to
-  # resolve two separate copies of drizzle-orm, breaking TypeScript types.
+  # Without this, transitive @opentelemetry/api peers can cause pnpm to resolve
+  # two separate copies of drizzle-orm, breaking TypeScript types.
   drizzle-orm: "0.45.2"

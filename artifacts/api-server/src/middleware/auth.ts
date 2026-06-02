@@ -40,21 +40,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function requireMobileVerified(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  if (!req.user?.mobileVerified) {
-    res.status(403).json({
-      error:
-        "Mobile verification required. Please verify your phone number to continue.",
-    });
-    return;
-  }
-  next();
-}
-
 export async function optionalAuth(
   req: Request,
   res: Response,

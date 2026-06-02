@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, creditLogsTable, videoJobsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
-import { requireAuth, requireMobileVerified } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
@@ -9,7 +9,7 @@ const router = Router();
  * GET /api/users/me
  * Full profile + credit balance.
  */
-router.get("/users/me", requireAuth, requireMobileVerified, (req, res) => {
+router.get("/users/me", requireAuth, (req, res) => {
   const user = req.user!;
   res.json({
     id: user.id,
@@ -28,7 +28,7 @@ router.get("/users/me", requireAuth, requireMobileVerified, (req, res) => {
  * GET /api/users/me/credits
  * Credit balance + last 20 transactions.
  */
-router.get("/users/me/credits", requireAuth, requireMobileVerified, async (req, res) => {
+router.get("/users/me/credits", requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   const [current] = await db
@@ -62,7 +62,7 @@ router.get("/users/me/credits", requireAuth, requireMobileVerified, async (req, 
  * GET /api/users/me/generations
  * Last 50 video jobs for this user (guest jobs not linked).
  */
-router.get("/users/me/generations", requireAuth, requireMobileVerified, async (req, res) => {
+router.get("/users/me/generations", requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   // Match via credit_logs → jobId — jobs created by this user
@@ -105,7 +105,7 @@ router.get("/users/me/generations", requireAuth, requireMobileVerified, async (r
  * PATCH /api/users/me
  * Update display name.
  */
-router.patch("/users/me", requireAuth, requireMobileVerified, async (req, res) => {
+router.patch("/users/me", requireAuth, async (req, res) => {
   const { username } = req.body as { username?: string };
 
   if (!username?.trim()) {

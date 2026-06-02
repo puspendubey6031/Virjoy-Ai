@@ -1,10 +1,9 @@
 import { Router } from "express";
 import { db, usersTable, creditLogsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { verifyFirebaseToken, isFirebaseReady } from "../services/firebase";
 import { verifySupabaseToken, isSupabaseAuthReady } from "../services/supabaseAuth";
 import { addCredits, PLAN_MONTHLY_CREDITS } from "../services/credits";
-import { requireAuth, requireMobileVerified } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
@@ -62,9 +61,9 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
-    // 2. Legacy account with the same email (e.g. pre-migration Firebase user
-    //    without a supabaseUid) — link it rather than create a duplicate. No
-    //    new welcome credits are granted for an existing account.
+    // 2. Legacy account with the same email but no supabaseUid yet — link it
+    //    rather than create a duplicate. No new welcome credits are granted for
+    //    an existing account.
     const [byEmail] = await db
       .select()
       .from(usersTable)
@@ -134,50 +133,6 @@ router.post("/auth/register", async (req, res) => {
 });
 
 /**
- * POST /api/auth/verify-mobile
- *
- * Called after the user completes Firebase phone OTP verification.
- * The new token should have phone_number populated.
- *
- * Body: { firebaseToken: string }
- */
-router.post("/auth/verify-mobile", requireAuth, async (req, res) => {
-  const { firebaseToken } = req.body as { firebaseToken?: string };
-
-  if (!firebaseToken) {
-    res.status(400).json({ error: "firebaseToken is required" });
-    return;
-  }
-
-  try {
-    const decoded = await verifyFirebaseToken(firebaseToken);
-
-    if (!decoded.phone_number) {
-      res.status(400).json({
-        error: "Phone number not found in token. Please complete OTP verification in Firebase first.",
-      });
-      return;
-    }
-
-    const [updated] = await db
-      .update(usersTable)
-      .set({
-        mobileNumber: decoded.phone_number,
-        mobileVerified: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, req.user!.id))
-      .returning();
-
-    req.log.info({ userId: updated.id }, "Mobile number verified");
-    res.json(formatUser(updated));
-  } catch (err: any) {
-    req.log.error({ err }, "Mobile verification failed");
-    res.status(400).json({ error: "Verification failed. Please try again." });
-  }
-});
-
-/**
  * GET /api/auth/me
  * Returns the current user's profile.
  */
@@ -189,7 +144,7 @@ router.get("/auth/me", requireAuth, (req, res) => {
  * POST /api/auth/claim-free-credits
  * Claim monthly free credits (once per 30 days).
  */
-router.post("/auth/claim-free-credits", requireAuth, requireMobileVerified, async (req, res) => {
+router.post("/auth/claim-free-credits", requireAuth, async (req, res) => {
   const user = req.user!;
   const { canClaimFreeCredits } = await import("../services/credits");
 

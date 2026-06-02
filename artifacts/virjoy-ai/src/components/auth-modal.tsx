@@ -53,7 +53,7 @@ interface AuthModalProps {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function AuthModal({ open, defaultTab = "login", onClose }: AuthModalProps) {
-  const { signUpWithEmail, signInWithEmail, isConfigured } = useAuth();
+  const { signUpWithEmail, signInWithEmail, sendPasswordReset, isConfigured } = useAuth();
   const { toast } = useToast();
 
   // Tab state — reset when modal opens
@@ -63,6 +63,7 @@ export function AuthModal({ open, defaultTab = "login", onClose }: AuthModalProp
   // Login state
   const [showLoginPw, setShowLoginPw] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Signup state
   const [showSignupPw, setShowSignupPw] = useState(false);
@@ -72,6 +73,28 @@ export function AuthModal({ open, defaultTab = "login", onClose }: AuthModalProp
   // Forms
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
   const signupForm = useForm<SignupForm>({ resolver: zodResolver(signupSchema) });
+
+  // ── Forgot password ─────────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    const email = loginForm.getValues("email")?.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: "Enter your email first",
+        description: "Type your account email above, then tap “Forgot password?”.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setResetting(true);
+    try {
+      await sendPasswordReset(email);
+      toast({ title: "Reset link sent", description: "Check your inbox to set a new password." });
+    } catch (err: any) {
+      toast({ title: "Couldn't send reset email", description: authMsg(err), variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // ── Login ──────────────────────────────────────────────────────────────────
   const handleLogin = async (data: LoginForm) => {
@@ -179,7 +202,13 @@ export function AuthModal({ open, defaultTab = "login", onClose }: AuthModalProp
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-white/60 text-xs font-medium uppercase tracking-wide">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-white/60 text-xs font-medium uppercase tracking-wide">Password</Label>
+                  <button type="button" onClick={handleForgotPassword} disabled={resetting || !isConfigured}
+                    className="text-xs text-primary/80 hover:text-primary transition-colors disabled:opacity-40 normal-case tracking-normal">
+                    {resetting ? "Sending…" : "Forgot password?"}
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
                   <Input

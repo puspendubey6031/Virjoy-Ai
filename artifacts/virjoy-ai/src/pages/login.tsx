@@ -19,14 +19,43 @@ type Form = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
-  const { signInWithEmail, isConfigured } = useAuth();
+  const { signInWithEmail, sendPasswordReset, isConfigured } = useAuth();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<Form>({
+  const { register, handleSubmit, getValues, formState: { errors } } = useForm<Form>({
     resolver: zodResolver(schema),
   });
+
+  const handleForgotPassword = async () => {
+    const email = getValues("email")?.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: "Enter your email first",
+        description: "Type your account email above, then tap “Forgot password?”.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setResetting(true);
+    try {
+      await sendPasswordReset(email);
+      toast({
+        title: "Reset link sent",
+        description: "Check your inbox for a link to set a new password.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Couldn't send reset email",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const onSubmit = async (data: Form) => {
     setLoading(true);
@@ -107,7 +136,17 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-sm font-medium">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-white/70 text-sm font-medium">Password</Label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetting || !isConfigured}
+                  className="text-xs text-primary/80 hover:text-primary transition-colors disabled:opacity-40"
+                >
+                  {resetting ? "Sending…" : "Forgot password?"}
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <Input

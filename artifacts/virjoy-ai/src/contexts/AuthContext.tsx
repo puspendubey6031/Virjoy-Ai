@@ -30,9 +30,8 @@ export interface SignUpResult {
 
 // ── Context type ──────────────────────────────────────────────────────────────
 interface AuthContextValue {
-  /** The authenticated Supabase user, or null. Kept as `firebaseUser` for
-   *  backwards compatibility with existing UI consumers. */
-  firebaseUser: SupabaseUser | null;
+  /** The authenticated Supabase user, or null. */
+  supabaseUser: SupabaseUser | null;
   dbUser: DbUser | null;
   authLoading: boolean;
   /** True when Supabase env vars are set and the client is initialised. */
@@ -46,6 +45,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   refreshDbUser: () => Promise<void>;
   getToken: () => Promise<string | null>;
+  /** Change the account email; Supabase sends a confirmation email. */
+  updateEmail: (newEmail: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -86,7 +87,7 @@ async function fetchDbUser(token: string): Promise<DbUser | null> {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<SupabaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
 
@@ -113,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const applySession = async (session: Session | null) => {
       if (!active) return;
-      setFirebaseUser(session?.user ?? null);
+      setSupabaseUser(session?.user ?? null);
       if (session?.access_token) {
         try {
           // Ensure a local record exists, then surface the latest profile.
@@ -215,10 +216,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDbUser(await fetchDbUser(token));
   }, [getToken]);
 
+  const updateEmail = useCallback(async (newEmail: string) => {
+    if (!supabase) throw new Error("Supabase is not configured");
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) throw error;
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
-        firebaseUser,
+        supabaseUser,
         dbUser,
         authLoading,
         isConfigured: isSupabaseConfigured,
@@ -229,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         refreshDbUser,
         getToken,
+        updateEmail,
       }}
     >
       {children}

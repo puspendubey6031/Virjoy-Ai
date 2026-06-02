@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Video, History, Sparkles, LogOut, Coins,
-  UserCircle, Menu, X, ChevronDown, ShieldCheck, Crown, Zap,
+  UserCircle, Menu, X, ChevronDown, ShieldCheck, Crown, Zap, Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NotFound from "@/pages/not-found";
@@ -23,6 +23,7 @@ import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import AccountPage from "@/pages/account";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AuthModal } from "@/components/auth-modal";
 
@@ -43,8 +44,8 @@ function getMaxCredits(plan: string) {
 
 // ── Profile dropdown ──────────────────────────────────────────────────────────
 function ProfileDropdown() {
-  const { firebaseUser, dbUser, signOut } = useAuth();
-  if (!firebaseUser) return null;
+  const { supabaseUser, dbUser, signOut } = useAuth();
+  if (!supabaseUser) return null;
   const plan = planConfig[dbUser?.currentPlan ?? "free"] ?? planConfig.free!;
 
   return (
@@ -52,10 +53,10 @@ function ProfileDropdown() {
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200 focus:outline-none">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
-            {(firebaseUser.email?.[0] ?? "U").toUpperCase()}
+            {(supabaseUser.email?.[0] ?? "U").toUpperCase()}
           </div>
           <span className="hidden lg:block text-sm text-white/70 max-w-[110px] truncate">
-            {firebaseUser.email}
+            {supabaseUser.email}
           </span>
           <ChevronDown className="w-3.5 h-3.5 text-white/40" />
         </button>
@@ -65,10 +66,10 @@ function ProfileDropdown() {
         <DropdownMenuLabel className="px-3 py-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-sm font-bold text-white shrink-0">
-              {(firebaseUser.email?.[0] ?? "U").toUpperCase()}
+              {(supabaseUser.email?.[0] ?? "U").toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{firebaseUser.email}</p>
+              <p className="text-sm font-semibold text-white truncate">{supabaseUser.email}</p>
               <div className={`flex items-center gap-1 text-xs mt-0.5 ${plan.color}`}>
                 {plan.icon}
                 <span>{plan.label} plan</span>
@@ -94,6 +95,12 @@ function ProfileDropdown() {
         )}
 
         <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem asChild
+          className="mx-1 my-1 gap-2 text-white/70 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer">
+          <Link href="/account">
+            <Settings className="w-4 h-4" /> Account settings
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => signOut()}
           className="mx-1 my-1 gap-2 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 focus:text-red-400 cursor-pointer">
           <LogOut className="w-4 h-4" /> Sign out
@@ -113,7 +120,7 @@ function Navbar({ onSignIn, onGetStarted }: NavbarProps) {
   const [location] = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { firebaseUser, dbUser, authLoading, signOut } = useAuth();
+  const { supabaseUser, dbUser, authLoading, signOut } = useAuth();
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 20);
@@ -168,7 +175,7 @@ function Navbar({ onSignIn, onGetStarted }: NavbarProps) {
               {authLoading ? (
                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-              ) : firebaseUser ? (
+              ) : supabaseUser ? (
                 <motion.div key="user" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
                   <ProfileDropdown />
                 </motion.div>
@@ -190,13 +197,13 @@ function Navbar({ onSignIn, onGetStarted }: NavbarProps) {
 
           {/* Mobile right: sign-in pill + avatar + hamburger */}
           <div className="flex sm:hidden items-center gap-2 shrink-0">
-            {!authLoading && !firebaseUser && (
+            {!authLoading && !supabaseUser && (
               <button onClick={onSignIn}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold text-white border border-primary/50 bg-primary/10 hover:bg-primary/20 transition-all">
                 Sign In
               </button>
             )}
-            {!authLoading && firebaseUser && <ProfileDropdown />}
+            {!authLoading && supabaseUser && <ProfileDropdown />}
             <button onClick={() => setMobileOpen((o) => !o)}
               className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
               aria-label="Toggle menu">
@@ -227,14 +234,14 @@ function Navbar({ onSignIn, onGetStarted }: NavbarProps) {
                 {!authLoading && (
                   <>
                     <div className="h-px bg-white/10 my-1" />
-                    {firebaseUser ? (
+                    {supabaseUser ? (
                       <>
                         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-sm font-bold text-white shrink-0">
-                            {(firebaseUser.email?.[0] ?? "U").toUpperCase()}
+                            {(supabaseUser.email?.[0] ?? "U").toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{firebaseUser.email}</p>
+                            <p className="text-sm font-medium text-white truncate">{supabaseUser.email}</p>
                             {dbUser && (
                               <p className={`text-xs mt-0.5 ${planConfig[dbUser.currentPlan]?.color ?? "text-white/50"}`}>
                                 {dbUser.credits} credits · {planConfig[dbUser.currentPlan]?.label ?? "Free"} plan
@@ -272,11 +279,11 @@ function Navbar({ onSignIn, onGetStarted }: NavbarProps) {
 
 // ── Guest banner ──────────────────────────────────────────────────────────────
 function GuestBanner({ onGetStarted }: { onGetStarted: () => void }) {
-  const { firebaseUser, authLoading } = useAuth();
+  const { supabaseUser, authLoading } = useAuth();
   const [location] = useLocation();
   const [dismissed, setDismissed] = useState(false);
 
-  if (authLoading || firebaseUser || dismissed || location !== "/") return null;
+  if (authLoading || supabaseUser || dismissed || location !== "/") return null;
 
   return (
     <motion.div
@@ -331,6 +338,7 @@ function Router() {
         <Route path="/signup" component={SignupPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route path="/account" component={AccountPage} />
         <Route component={NotFound} />
       </Switch>
 

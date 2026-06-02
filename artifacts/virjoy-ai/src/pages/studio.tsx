@@ -109,7 +109,7 @@ const TONE_OPTIONS = [
 
 export default function Studio() {
   const [, navigate] = useLocation();
-  const { firebaseUser, authLoading } = useAuth();
+  const { supabaseUser, authLoading } = useAuth();
   const { data: plans } = useGetPlans();
   const createVideoJob = useCreateVideoJob();
   const generateAiStory = useGenerateAiStory();
@@ -190,7 +190,7 @@ export default function Studio() {
     if (authLoading) return;
 
     // Gate video generation behind authentication.
-    if (!firebaseUser) {
+    if (!supabaseUser) {
       toast({
         title: "Sign in required",
         description: "Please sign in to generate cinematic videos.",
@@ -226,7 +226,7 @@ export default function Studio() {
       e.preventDefault();
       return;
     }
-    if (!firebaseUser) {
+    if (!supabaseUser) {
       e.preventDefault();
       toast({
         title: "Sign in required",
