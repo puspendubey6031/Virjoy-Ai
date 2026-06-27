@@ -4,13 +4,19 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
+// Prefer the Supabase Postgres connection when configured; otherwise fall back
+// to the Replit-provided database. This lets the app's data live in the same
+// project as Supabase Auth without overwriting the runtime-managed DATABASE_URL.
+const connectionString =
+  process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
+
+if (!connectionString) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "No database connection string set. Provide SUPABASE_DATABASE_URL or DATABASE_URL.",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({ connectionString });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
