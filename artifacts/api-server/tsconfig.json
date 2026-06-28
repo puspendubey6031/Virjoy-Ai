@@ -3,7 +3,17 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@workspace/db": ["../../lib/db/src/index.ts"],
+      "@workspace/db/schema": ["../../lib/db/src/schema/index.ts"],
+      "@workspace/api-zod": ["../../lib/api-zod/src/index.ts"],
+      "@workspace/integrations-gemini-ai": ["../../lib/integrations-gemini-ai/src/index.ts"],
+      "@workspace/integrations-gemini-ai/batch": ["../../lib/integrations-gemini-ai/src/batch/index.ts"],
+      "@workspace/integrations-gemini-ai/image": ["../../lib/integrations-gemini-ai/src/image/index.ts"]
+    }
   },
   "include": ["src"],
   "references": [
