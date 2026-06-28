@@ -1,0 +1,5 @@
+{
+  "version": 2,
+  "installCommand": "cd ../../ && pnpm install",
+  "buildCommand": "node ./build.mjs"
+}
